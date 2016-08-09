@@ -8,12 +8,12 @@ defmodule Mdns.Client do
         header: %DNS.Header{},
         qdlist: [
             %DNS.Query{domain: to_char_list("_services._dns-sd._udp.local"), type: :ptr, class: :in},
-            %DNS.Query{domain: to_char_list("_workstation._tcp.local"), type: :ptr, class: :in},
-            %DNS.Query{domain: to_char_list("_http._tcp.local"), type: :ptr, class: :in},
-            %DNS.Query{domain: to_char_list("_sftp-ssh._tcp.local"), type: :ptr, class: :in},
-            %DNS.Query{domain: to_char_list("_ssh._tcp.local"), type: :ptr, class: :in},
-            %DNS.Query{domain: to_char_list("b._dns-sd._udp.local"), type: :ptr, class: :in},
-            %DNS.Query{domain: to_char_list("_googlecast._tcp.local"), type: :ptr, class: :in},
+            #%DNS.Query{domain: to_char_list("_http._tcp.local"), type: :ptr, class: :in},
+            #%DNS.Query{domain: to_char_list("_googlecast._tcp.local"), type: :ptr, class: :in},
+            #%DNS.Query{domain: to_char_list("_workstation._tcp.local"), type: :ptr, class: :in},
+            #%DNS.Query{domain: to_char_list("_sftp-ssh._tcp.local"), type: :ptr, class: :in},
+            #%DNS.Query{domain: to_char_list("_ssh._tcp.local"), type: :ptr, class: :in},
+            #%DNS.Query{domain: to_char_list("b._dns-sd._udp.local"), type: :ptr, class: :in},
         ]
     }
 
@@ -86,17 +86,24 @@ defmodule Mdns.Client do
     end
 
     def handle_info({:udp, socket, ip, port, data}, state) do
+        Logger.debug "<----------------------- New Packet (#{inspect ip}) ------------------------>"
         {:ok, record} = :inet_dns.decode(data)
+        qs = :inet_dns.msg(record, :qdlist)
+        Logger.debug("QS: #{inspect qs}")
+        questions = for q <- qs, do: :maps.from_list(:inet_dns.dns_query(q))
+        Logger.debug("Questions: #{inspect questions}")
         answers = rr(:inet_dns.msg(record, :anlist))
-        GenEvent.notify(state.events, {:device, %Device{:ip => ip, :answers => answers}})
+        Logger.debug("Answers: #{inspect answers}")
+        resources = rr(:inet_dns.msg(record, :arlist))
+        Logger.debug("Resources: #{inspect resources}")
+        header = :inet_dns.header(:inet_dns.msg(record, :header))
+        Logger.debug("Header: #{inspect header}")
+        record_type = :inet_dns.record_type(record)
+        Logger.debug("Record Type: #{inspect record_type}")
+        authorities = rr(:inet_dns.msg(record, :nslist))
+        Logger.debug("Authorities: #{inspect authorities}")
+        #GenEvent.notify(state.events, {:device, %Device{:ip => ip, :answers => answers}})
         {:noreply, state}
-        #resources = rr(:inet_dns.msg(record, :arlist))
-        #header = :inet_dns.header(:inet_dns.msg(record, :header))
-        #record_type = :inet_dns.record_type(record)
-        #qs = :inet_dns.msg(record, :qdlist)
-        #questions = for q <- qs, do: :maps.from_list(:inet_dns.dns_query(q))
-        #authorities = rr(:inet_dns.msg(record, :nslist))
-
     end
 
     def handle_info({:device, device}, state) do
