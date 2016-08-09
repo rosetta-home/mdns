@@ -90,27 +90,27 @@ defmodule Mdns.Client do
         {:noreply, state}
     end
 
-    def handle_info({:udp, socket, ip, port, data}, state) do
+    def handle_info({:udp, socket, ip, port, packet}, state) do
         {:noreply, cond do
             Enum.any?(state.ips, fn(i) -> i == ip end) -> state
-            true -> handle_packet(ip, data, state) |> IO.inspect
+            true -> handle_packet(ip, packet, state) |> IO.inspect
         end}
     end
 
-    def handle_packet(ip, data, state) do
-        {:ok, record} = :inet_dns.decode(data)
+    def handle_packet(ip, packet, state) do
+        {:ok, record} = :inet_dns.decode(packet)
         qs = :inet_dns.msg(record, :qdlist)
         cond do
             Enum.any?(qs) -> state
-            true -> handle_device(ip, record, state)
+            true -> handle_record(ip, record, state)
         end
     end
 
-    def handle_device(ip, record, state) do
+    def handle_record(ip, record, state) do
         Logger.debug "<----------------------- New Packet (#{inspect ip}) ------------------------>"
         orig_device = Enum.find(state.devices, %Device{:ip => ip}, fn(d) -> d.ip == ip end)
         device = rr(:inet_dns.msg(record, :anlist)) ++ rr(:inet_dns.msg(record, :arlist))
-        |> Enum.reduce(orig_device, fn(r, acc) -> handle_record(r, acc) end)
+        |> Enum.reduce(orig_device, fn(r, acc) -> handle_device(r, acc) end)
         GenEvent.notify(state.events, {:device, device})
         cond do
             Enum.any?(state.devices, fn(dev) -> dev.ip == device.ip end) ->
@@ -124,15 +124,15 @@ defmodule Mdns.Client do
         end
     end
 
-    def handle_record(%{:type => :ptr} = record, device) do
+    def handle_device(%{:type => :ptr} = record, device) do
         %Device{device | :services => Enum.uniq([to_string(record.data) | device.services])}
     end
 
-    def handle_record(%{:type => :a} = record, device) do
+    def handle_device(%{:type => :a} = record, device) do
         %Device{device | :domain => to_string(record.domain)}
     end
 
-    def handle_record(%{:type => :txt} = record, device) do
+    def handle_device(%{:type => :txt} = record, device) do
         %Device{device | :payload => Enum.reduce(record.data, %{}, fn(kv, acc) ->
             case String.split(to_string(kv), "=", parts: 2) do
                 [k, v] -> Map.put(acc, String.to_atom(String.downcase(k)), String.strip(v))
@@ -141,7 +141,7 @@ defmodule Mdns.Client do
         end)}
     end
 
-    def handle_record(%{:type => type} = record, device) do
+    def handle_device(%{:type => type} = record, device) do
         device
     end
 
