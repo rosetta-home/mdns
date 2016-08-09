@@ -8,12 +8,12 @@ defmodule Mdns.Client do
         header: %DNS.Header{},
         qdlist: [
             %DNS.Query{domain: to_char_list("_services._dns-sd._udp.local"), type: :ptr, class: :in},
-            #%DNS.Query{domain: to_char_list("_http._tcp.local"), type: :ptr, class: :in},
-            #%DNS.Query{domain: to_char_list("_googlecast._tcp.local"), type: :ptr, class: :in},
-            #%DNS.Query{domain: to_char_list("_workstation._tcp.local"), type: :ptr, class: :in},
-            #%DNS.Query{domain: to_char_list("_sftp-ssh._tcp.local"), type: :ptr, class: :in},
-            #%DNS.Query{domain: to_char_list("_ssh._tcp.local"), type: :ptr, class: :in},
-            #%DNS.Query{domain: to_char_list("b._dns-sd._udp.local"), type: :ptr, class: :in},
+            %DNS.Query{domain: to_char_list("_http._tcp.local"), type: :ptr, class: :in},
+            %DNS.Query{domain: to_char_list("_googlecast._tcp.local"), type: :ptr, class: :in},
+            %DNS.Query{domain: to_char_list("_workstation._tcp.local"), type: :ptr, class: :in},
+            %DNS.Query{domain: to_char_list("_sftp-ssh._tcp.local"), type: :ptr, class: :in},
+            %DNS.Query{domain: to_char_list("_ssh._tcp.local"), type: :ptr, class: :in},
+            %DNS.Query{domain: to_char_list("b._dns-sd._udp.local"), type: :ptr, class: :in},
         ]
     }
 
@@ -21,12 +21,15 @@ defmodule Mdns.Client do
         defstruct devices: [],
             udp: nil,
             events: nil,
-            handlers: []
+            handlers: [],
+            ips: []
     end
 
     defmodule Device do
         defstruct ip: nil,
-            answers: []
+            services: [],
+            domain: nil,
+            payload: %{}
     end
 
     def start_link do
@@ -46,6 +49,9 @@ defmodule Mdns.Client do
     end
 
     def init(:ok) do
+        ips = Enum.map(elem(:inet.getif(), 1), fn(i) ->
+            elem(i, 0)
+        end)
         udp_options = [
             :binary,
             active:          true,
@@ -57,10 +63,9 @@ defmodule Mdns.Client do
         ]
 
         {:ok, events} = GenEvent.start_link([{:name, Mdns.Client.Events}])
-        GenEvent.add_mon_handler(events, Mdns.Handler, self)
         {:ok, udp} = :gen_udp.open(@port, udp_options)
         Process.send_after(self(), :discover, 100)
-        {:ok, %State{:udp => udp, :events => events, :handlers => [{Mdns.Handler, self}]}}
+        {:ok, %State{:udp => udp, :events => events, :handlers => [{Mdns.Handler, self}], :ips => ips}}
     end
 
     def handle_call({:handler, handler}, {pid, _} = from, state) do
@@ -86,46 +91,67 @@ defmodule Mdns.Client do
     end
 
     def handle_info({:udp, socket, ip, port, data}, state) do
-        Logger.debug "<----------------------- New Packet (#{inspect ip}) ------------------------>"
+        {:noreply, cond do
+            Enum.any?(state.ips, fn(i) -> i == ip end) -> state
+            true -> handle_packet(ip, data, state) |> IO.inspect
+        end}
+    end
+
+    def handle_packet(ip, data, state) do
         {:ok, record} = :inet_dns.decode(data)
         qs = :inet_dns.msg(record, :qdlist)
-        Logger.debug("QS: #{inspect qs}")
-        questions = for q <- qs, do: :maps.from_list(:inet_dns.dns_query(q))
-        Logger.debug("Questions: #{inspect questions}")
-        answers = rr(:inet_dns.msg(record, :anlist))
-        Logger.debug("Answers: #{inspect answers}")
-        resources = rr(:inet_dns.msg(record, :arlist))
-        Logger.debug("Resources: #{inspect resources}")
+        cond do
+            Enum.any?(qs) -> state
+            true -> handle_device(ip, record, state)
+        end
+    end
+
+    def handle_device(ip, record, state) do
+        Logger.debug "<----------------------- New Packet (#{inspect ip}) ------------------------>"
+        orig_device = Enum.find(state.devices, %Device{:ip => ip}, fn(d) -> d.ip == ip end)
+        device = rr(:inet_dns.msg(record, :anlist)) ++ rr(:inet_dns.msg(record, :arlist))
+        |> Enum.reduce(orig_device, fn(r, acc) -> handle_record(r, acc) end)
+        GenEvent.notify(state.events, {:device, device})
+        cond do
+            Enum.any?(state.devices, fn(dev) -> dev.ip == device.ip end) ->
+                %State{state | :devices => Enum.map(state.devices, fn(d) ->
+                    cond do
+                        device.ip == d.ip -> Map.merge(d, device)
+                        true -> d
+                    end
+                end)}
+            true -> %State{state | :devices => [device | state.devices]}
+        end
+    end
+
+    def handle_record(%{:type => :ptr} = record, device) do
+        %Device{device | :services => Enum.uniq([to_string(record.data) | device.services])}
+    end
+
+    def handle_record(%{:type => :a} = record, device) do
+        %Device{device | :domain => to_string(record.domain)}
+    end
+
+    def handle_record(%{:type => :txt} = record, device) do
+        %Device{device | :payload => Enum.reduce(record.data, %{}, fn(kv, acc) ->
+            case String.split(to_string(kv), "=", parts: 2) do
+                [k, v] -> Map.put(acc, String.to_atom(String.downcase(k)), String.strip(v))
+                _ -> nil
+            end
+        end)}
+    end
+
+    def handle_record(%{:type => type} = record, device) do
+        device
+    end
+
+    def other(record) do
         header = :inet_dns.header(:inet_dns.msg(record, :header))
         Logger.debug("Header: #{inspect header}")
         record_type = :inet_dns.record_type(record)
         Logger.debug("Record Type: #{inspect record_type}")
         authorities = rr(:inet_dns.msg(record, :nslist))
         Logger.debug("Authorities: #{inspect authorities}")
-        #GenEvent.notify(state.events, {:device, %Device{:ip => ip, :answers => answers}})
-        {:noreply, state}
-    end
-
-    def handle_info({:device, device}, state) do
-        new_state =
-            cond do
-                Enum.any?(state.devices, fn(dev) -> dev.ip == device.ip end) ->
-                    %State{state | :devices => Enum.map(state.devices, fn(d) ->
-                        cond do
-                            device.ip == d.ip -> %Device{d | :answers => Enum.uniq(device.answers ++ d.answers)}
-                            true -> d
-                        end
-                    end)}
-                true ->
-                    cond do
-                        Enum.any?(device.answers) ->
-                            Logger.debug "New Device #{inspect device}"
-                            %State{state | :devices => [device | state.devices]}
-                        true ->
-                            state
-                    end
-            end
-        {:noreply, new_state}
     end
 
     def rr(resources) do
