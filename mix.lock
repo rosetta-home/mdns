@@ -1,2 +1,2 @@
-%{"dns": {:hex, :dns, "0.0.3", "d2acbeeb105deb2692faeedccf65d3512c88fea8118f0451f926de06f1f7e0ad", [:mix], []},
-  "socket": {:git, "https://github.com/tungd/elixir-socket.git", "fd7d726bc91164837b7ed06421b21322da07c8e8", []}}
+%{"dns": {:hex, :dns, "0.0.4", "2e347a0a03e8345bc70c6d69ed08788103a3bec81b93e4636b1b432110835436", [:mix], [{:socket, "~> 0.3.5", [hex: :socket, optional: false]}]},
+  "socket": {:hex, :socket, "0.3.5", "6c23772e7eda60f129f36dd69a61930aab18ae9b8d74d7f767c85355cf0b585d", [:mix], []}}

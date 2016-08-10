@@ -6,23 +6,26 @@ defmodule Mdns.Client do
     @port 5353
     @query_packet %DNS.Record{
         header: %DNS.Header{},
-        qdlist: [
-            %DNS.Query{domain: to_char_list("_services._dns-sd._udp.local"), type: :ptr, class: :in},
-            %DNS.Query{domain: to_char_list("_http._tcp.local"), type: :ptr, class: :in},
-            %DNS.Query{domain: to_char_list("_googlecast._tcp.local"), type: :ptr, class: :in},
-            %DNS.Query{domain: to_char_list("_workstation._tcp.local"), type: :ptr, class: :in},
-            %DNS.Query{domain: to_char_list("_sftp-ssh._tcp.local"), type: :ptr, class: :in},
-            %DNS.Query{domain: to_char_list("_ssh._tcp.local"), type: :ptr, class: :in},
-            %DNS.Query{domain: to_char_list("b._dns-sd._udp.local"), type: :ptr, class: :in},
-        ]
+        qdlist: []
     }
 
+    @default_queries [
+        %DNS.Query{domain: to_char_list("_services._dns-sd._udp.local"), type: :ptr, class: :in},
+        %DNS.Query{domain: to_char_list("_http._tcp.local"), type: :ptr, class: :in},
+        %DNS.Query{domain: to_char_list("_googlecast._tcp.local"), type: :ptr, class: :in},
+        %DNS.Query{domain: to_char_list("_workstation._tcp.local"), type: :ptr, class: :in},
+        %DNS.Query{domain: to_char_list("_sftp-ssh._tcp.local"), type: :ptr, class: :in},
+        %DNS.Query{domain: to_char_list("_ssh._tcp.local"), type: :ptr, class: :in},
+        %DNS.Query{domain: to_char_list("b._dns-sd._udp.local"), type: :ptr, class: :in},
+    ]
+
     defmodule State do
-        defstruct devices: [],
+        defstruct devices: %{:other => []},
             udp: nil,
             events: nil,
             handlers: [],
-            ips: []
+            ips: [],
+            queries: []
     end
 
     defmodule Device do
@@ -36,8 +39,8 @@ defmodule Mdns.Client do
         GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
     end
 
-    def discover do
-        GenServer.call(__MODULE__, :discover)
+    def query(namespace \\ "_services._dns-sd._udp.local") do
+        GenServer.call(__MODULE__, {:query, namespace})
     end
 
     def devices do
@@ -64,7 +67,6 @@ defmodule Mdns.Client do
 
         {:ok, events} = GenEvent.start_link([{:name, Mdns.Client.Events}])
         {:ok, udp} = :gen_udp.open(@port, udp_options)
-        Process.send_after(self(), :discover, 100)
         {:ok, %State{:udp => udp, :events => events, :handlers => [{Mdns.Handler, self}], :ips => ips}}
     end
 
@@ -77,6 +79,14 @@ defmodule Mdns.Client do
         {:reply, state.devices, state}
     end
 
+    def handle_call({:query, namespace}, _from, state) do
+        packet = %DNS.Record{@query_packet | :qdlist => [
+            %DNS.Query{domain: to_char_list(namespace), type: :ptr, class: :in}
+        ]}
+        :gen_udp.send(state.udp, @mdns_group, @port, DNS.Record.encode(packet))
+        {:reply, :ok,  %State{state | :queries => Enum.uniq([namespace | state.queries])}}
+    end
+
     def handle_info({:gen_event_EXIT, handler, reason}, state) do
         Enum.each(state.handlers, fn(h) ->
             GenEvent.add_mon_handler(state.events, elem(h, 0), elem(h, 1))
@@ -84,16 +94,10 @@ defmodule Mdns.Client do
         {:noreply, state}
     end
 
-    def handle_info(:discover, state) do
-        :gen_udp.send(state.udp, @mdns_group, @port, DNS.Record.encode(@query_packet))
-        Process.send_after(self(), :discover, 10000)
-        {:noreply, state}
-    end
-
     def handle_info({:udp, socket, ip, port, packet}, state) do
         {:noreply, cond do
             Enum.any?(state.ips, fn(i) -> i == ip end) -> state
-            true -> handle_packet(ip, packet, state) |> IO.inspect
+            true -> handle_packet(ip, packet, state)
         end}
     end
 
@@ -107,21 +111,18 @@ defmodule Mdns.Client do
     end
 
     def handle_record(ip, record, state) do
-        Logger.debug "<----------------------- New Packet (#{inspect ip}) ------------------------>"
-        orig_device = Enum.find(state.devices, %Device{:ip => ip}, fn(d) -> d.ip == ip end)
-        device = rr(:inet_dns.msg(record, :anlist)) ++ rr(:inet_dns.msg(record, :arlist))
-        |> Enum.reduce(orig_device, fn(r, acc) -> handle_device(r, acc) end)
-        GenEvent.notify(state.events, {:device, device})
-        cond do
-            Enum.any?(state.devices, fn(dev) -> dev.ip == device.ip end) ->
-                %State{state | :devices => Enum.map(state.devices, fn(d) ->
-                    cond do
-                        device.ip == d.ip -> Map.merge(d, device)
-                        true -> d
-                    end
-                end)}
-            true -> %State{state | :devices => [device | state.devices]}
-        end
+        device = get_device(ip, record, state)
+        devices =
+            Enum.reduce(state.queries, %{:other => []}, fn(query, acc) ->
+                cond do
+                    Enum.any?(device.services, fn(service) -> String.ends_with?(service, query) end) ->
+                        {namespace, devices} = create_namespace_devices(query, device, acc, state)
+                        GenEvent.notify(state.events, {namespace, device})
+                        devices
+                    true -> Map.merge(acc, state.devices)
+                end
+            end)
+        %State{state | :devices => devices}
     end
 
     def handle_device(%{:type => :ptr} = record, device) do
@@ -135,7 +136,7 @@ defmodule Mdns.Client do
     def handle_device(%{:type => :txt} = record, device) do
         %Device{device | :payload => Enum.reduce(record.data, %{}, fn(kv, acc) ->
             case String.split(to_string(kv), "=", parts: 2) do
-                [k, v] -> Map.put(acc, String.to_atom(String.downcase(k)), String.strip(v))
+                [k, v] -> Map.put(acc, String.downcase(k), String.strip(v))
                 _ -> nil
             end
         end)}
@@ -145,6 +146,37 @@ defmodule Mdns.Client do
         device
     end
 
+    def get_device(ip, record, state) do
+        orig_device = Enum.concat(Map.values(state.devices))
+        |> Enum.find(%Device{:ip => ip}, fn(device) ->
+            device.ip == ip
+        end)
+        rr(:inet_dns.msg(record, :anlist)) ++ rr(:inet_dns.msg(record, :arlist))
+        |> Enum.reduce(orig_device, fn(r, acc) -> handle_device(r, acc) end)
+    end
+
+    def create_namespace_devices(query, device, devices, state) do
+        namespace = String.to_atom(query)
+        {namespace, cond do
+            Enum.any?(Map.get(state.devices, namespace, []), fn(dev) -> dev.ip == device.ip end) ->
+                Map.merge(devices, %{namespace => merge_device(device, namespace, state)})
+            true -> Map.merge(devices, %{namespace => [device | Map.get(state.devices, namespace, [])]})
+        end}
+    end
+
+    def merge_device(device, namespace, state) do
+        Enum.map(Map.get(state.devices, namespace, []), fn(d) ->
+            cond do
+                device.ip == d.ip -> Map.merge(d, device)
+                true -> d
+            end
+        end)
+    end
+
+    def rr(resources) do
+        for resource <- resources, do: :maps.from_list(:inet_dns.rr(resource))
+    end
+
     def other(record) do
         header = :inet_dns.header(:inet_dns.msg(record, :header))
         Logger.debug("Header: #{inspect header}")
@@ -152,10 +184,6 @@ defmodule Mdns.Client do
         Logger.debug("Record Type: #{inspect record_type}")
         authorities = rr(:inet_dns.msg(record, :nslist))
         Logger.debug("Authorities: #{inspect authorities}")
-    end
-
-    def rr(resources) do
-        for resource <- resources, do: :maps.from_list(:inet_dns.rr(resource))
     end
 
 end

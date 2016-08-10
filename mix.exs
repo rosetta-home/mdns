@@ -30,6 +30,6 @@ defmodule Mdns.Mixfile do
   #
   # Type "mix help deps" for more examples and options
   defp deps do
-    [{:dns, "~> 0.0.3"}, {:socket, github: "tungd/elixir-socket"}]
+    [{:dns, "~> 0.0.4"}]
   end
 end
