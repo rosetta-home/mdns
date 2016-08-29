@@ -9,35 +9,66 @@ A simple [mDNS](https://en.wikipedia.org/wiki/Multicast_DNS) client for device d
     3. iex -S mix
 
 ## Usage
-On startup `Mdns.Client` will broadcast a discovery packet over the local network. Compliant devices will respond with a DNS response. `Mdns.Client` will notify the event bus, available at `Mdns.Client.Events`, of any devices it finds. Every 10 seconds it sends out another discovery broadcast to find any new devices on the network. The event bus will broadcast all devices, not just the new ones it finds. It is up to the developer to handle de-duping the devices broadcast over the event bus. However there is a function `Mdns.Client.devices` that will return a list of all the unique devices on the network.
+To discover a device in a namespace call `Mdns.Client.query(namespace \\ "_services._dns-sd._udp.local")`. Compliant devices will respond with a DNS response. `Mdns.Client` will notify the event bus, available at `Mdns.Client.Events`, of any devices it finds.
 
-The events broadcast over the event bus are in the form `{:device, device}` where the device is a Map that consists of the following fields.
+Calling `Mdns.Client.query("_googlecast._tcp.local")`
 
-    %Mdns.Client.Device{
-        answers: [
-            %{
-                class: :in,
-                data: '_googlecast._tcp.local',
-                domain: '_services._dns-sd._udp.local',
-                ttl: 4500,
-                type: :ptr
-            }
-        ],
-        ip: {192, 168, 1, 138}
+assuming you have a Chromecast on your network, an event is broadcasted on `Mdns.Client.Events` that looks like this
+
+    {:"_googlecast._tcp.local",
+        %Mdns.Client.Device{
+            domain: "CRT-Labs.local",
+            ip: {192, 168, 1, 138},
+            payload: %{
+                "bs" => "FA8FCA79C426",
+                "ca" => "4101",
+                "fn" => "CRT-Labs",
+                "ic" => "/setup/icon.png",
+                "id" => "e0617de7e2df63476fab257c8327ef3b",
+                "md" => "Chromecast",
+                "rm" => "E81C9A486980AA48",
+                "rs" => "",
+                "st" => "0",
+                "ve" => "05"
+            },
+            services: [
+                "CRT-Labs._googlecast._tcp.local"
+            ]
+        }
     }
 
-For an example implementation of an event handler see `Mdns.Handler`. To add a handler to the event bus call `Mdns.Client.add_handler(handler)`
+After calling `Mdns.Client.query("_ssh._tcp.local")` in addition to the Chromecast call above, `Mdns.Client.devices` will return a devices map similar to this. Assuming you have a device on the network that supports `ssh`.
 
-    defmodule Mdns.Handler do
-        use GenEvent
-        require Logger
-
-        def init do
-            {:ok, []}
-        end
-
-        def handle_event({:device, device} = obj, parent) do
-            send(parent, obj)
-            {:ok, parent}
-        end
-    end
+    %{"_googlecast._tcp.local": [
+            %Mdns.Client.Device{
+                domain: "CRT-Labs.local",
+                ip: {192, 168, 1, 138},
+                payload: %{
+                    "bs" => "FA8FCA79C426",
+                    "ca" => "4101",
+                    "fn" => "CRT-Labs",
+                    "ic" => "/setup/icon.png",
+                    "id" => "e0617de7e2df63476fab257c8327ef3b",
+                    "md" => "Chromecast",
+                    "rm" => "E81C9A486980AA48",
+                    "rs" => "",
+                    "st" => "0",
+                    "ve" => "05"
+                },
+                services: [
+                    "CRT-Labs._googlecast._tcp.local"
+                ]
+            }
+        ],
+        "_ssh._tcp.local": [
+            %Mdns.Client.Device{
+                domain: "pc-6105006P.local",
+                ip: {192, 168, 1, 26},
+                payload: nil,
+                services: [
+                    "pc-6105006P._ssh._tcp.local"
+                ]
+            }
+        ],
+        other: []
+    }

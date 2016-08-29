@@ -67,7 +67,7 @@ defmodule Mdns.Client do
 
         {:ok, events} = GenEvent.start_link([{:name, Mdns.Client.Events}])
         {:ok, udp} = :gen_udp.open(@port, udp_options)
-        {:ok, %State{:udp => udp, :events => events, :handlers => [{Mdns.Handler, self}], :ips => ips}}
+        {:ok, %State{:udp => udp, :events => events, :ips => ips}}
     end
 
     def handle_call({:handler, handler}, {pid, _} = from, state) do
@@ -118,6 +118,7 @@ defmodule Mdns.Client do
                     Enum.any?(device.services, fn(service) -> String.ends_with?(service, query) end) ->
                         {namespace, devices} = create_namespace_devices(query, device, acc, state)
                         GenEvent.notify(state.events, {namespace, device})
+                        Logger.debug("Device: #{inspect {namespace, device}}")
                         devices
                     true -> Map.merge(acc, state.devices)
                 end

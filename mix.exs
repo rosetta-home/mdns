@@ -7,6 +7,8 @@ defmodule Mdns.Mixfile do
      elixir: "~> 1.3",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
+     description: description(),
+     package: package(),
      deps: deps()]
   end
 
@@ -20,15 +22,23 @@ defmodule Mdns.Mixfile do
     ]
   end
 
-  # Dependencies can be Hex packages:
-  #
-  #   {:mydep, "~> 0.3.0"}
-  #
-  # Or git/path repositories:
-  #
-  #   {:mydep, git: "https://github.com/elixir-lang/mydep.git", tag: "0.1.0"}
-  #
-  # Type "mix help deps" for more examples and options
+  def description do
+      """
+      A simple mDNS (zeroconf, bonjour) client for device discovery on your local network.
+      """
+  end
+
+  def package do
+    [
+      name: :mdns,
+      files: ["lib", "mix.exs", "README*", "LICENSE*"],
+      maintainers: ["Christopher Steven Coté"],
+      licenses: ["MIT License"],
+      links: %{"GitHub" => "https://github.com/NationalAssociationOfRealtors/raven",
+          "Docs" => "https://github.com/NationalAssociationOfRealtors/raven"}
+    ]
+  end
+
   defp deps do
     [{:dns, "~> 0.0.4"}]
   end
