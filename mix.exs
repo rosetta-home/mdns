@@ -34,8 +34,8 @@ defmodule Mdns.Mixfile do
       files: ["lib", "mix.exs", "README*", "LICENSE*"],
       maintainers: ["Christopher Steven Coté"],
       licenses: ["MIT License"],
-      links: %{"GitHub" => "https://github.com/NationalAssociationOfRealtors/raven",
-          "Docs" => "https://github.com/NationalAssociationOfRealtors/raven"}
+      links: %{"GitHub" => "https://github.com/NationalAssociationOfRealtors/mdns",
+          "Docs" => "https://github.com/NationalAssociationOfRealtors/mdns"}
     ]
   end
 
