@@ -9,6 +9,16 @@ defmodule Mdns.Client do
         qdlist: []
     }
 
+    @response_packet %DNS.Record{
+        header: %DNS.Header{
+            aa: true,
+            qr: true,
+            opcode: 0,
+            rcode: 0,
+        },
+        anlist: []
+    }
+
     @default_queries [
         %DNS.Query{domain: to_char_list("_services._dns-sd._udp.local"), type: :ptr, class: :in},
         %DNS.Query{domain: to_char_list("_http._tcp.local"), type: :ptr, class: :in},
@@ -25,7 +35,16 @@ defmodule Mdns.Client do
             events: nil,
             handlers: [],
             ips: [],
-            queries: []
+            queries: [],
+            services: [
+                %{
+                    name: "_rosetta._tcp.local",
+                    domain: "_nerves._tcp.local",
+                    data: "rosetta.local",
+                    ttl: 120,
+                    type: :ptr
+                }
+            ]
     end
 
     defmodule Device do
@@ -95,22 +114,46 @@ defmodule Mdns.Client do
     end
 
     def handle_info({:udp, socket, ip, port, packet}, state) do
-        {:noreply, cond do
-            Enum.any?(state.ips, fn(i) -> i == ip end) -> state
-            true -> handle_packet(ip, packet, state)
-        end}
+        {:noreply, handle_packet(ip, packet, state)}
     end
 
     def handle_packet(ip, packet, state) do
-        {:ok, record} = :inet_dns.decode(packet)
-        qs = :inet_dns.msg(record, :qdlist)
-        cond do
-            Enum.any?(qs) -> state
-            true -> handle_record(ip, record, state)
+        record = DNS.Record.decode(packet)
+        case record.header.qr do
+            true -> handle_response(ip, record, state)
+            false -> handle_query(ip, record, state)
         end
     end
 
-    def handle_record(ip, record, state) do
+    def handle_query(ip, record, state) do
+        Logger.debug("Got Query: #{inspect record}")
+        Enum.flat_map(record.qdlist, fn(%DNS.Query{} = q) ->
+            Enum.reduce(state.services, [], fn(service, answers) ->
+                cond do
+                    service.domain == to_string(q.domain) ->
+                        [%DNS.Resource{
+                            class: :in,
+                            type: service.type,
+                            ttl: service.ttl,
+                            data: to_char_list(service.name),
+                            domain: to_char_list(service.domain)
+                        },
+                        %DNS.Resource{
+                            class: :in,
+                            type: service.type,
+                            ttl: service.ttl,
+                            data: to_char_list(service.data),
+                            domain: to_char_list(service.name)
+                        }] ++ answers
+                    true -> answers
+                end
+            end)
+        end) |> send_service_response(state)
+        state
+    end
+
+    def handle_response(ip, record, state) do
+        Logger.debug("Got Response: #{inspect record}")
         device = get_device(ip, record, state)
         devices =
             Enum.reduce(state.queries, %{:other => []}, fn(query, acc) ->
@@ -126,16 +169,16 @@ defmodule Mdns.Client do
         %State{state | :devices => devices}
     end
 
-    def handle_device(%{:type => :ptr} = record, device) do
+    def handle_device(%DNS.Resource{:type => :ptr} = record, device) do
         %Device{device | :services => Enum.uniq([to_string(record.data) | device.services])}
     end
 
-    def handle_device(%{:type => :a} = record, device) do
+    def handle_device(%DNS.Resource{:type => :a} = record, device) do
         %Device{device | :domain => to_string(record.domain)}
     end
 
-    def handle_device(%{:type => :txt} = record, device) do
-        %Device{device | :payload => Enum.reduce(record.data, %{}, fn(kv, acc) ->
+    def handle_device({:dns_rr, d, :txt, id, _, _, data, _, _, _} = record, device) do
+        %Device{device | :payload => Enum.reduce(data, %{}, fn(kv, acc) ->
             case String.split(to_string(kv), "=", parts: 2) do
                 [k, v] -> Map.put(acc, String.downcase(k), String.strip(v))
                 _ -> nil
@@ -143,7 +186,15 @@ defmodule Mdns.Client do
         end)}
     end
 
-    def handle_device(%{:type => type} = record, device) do
+    def handle_device(%DNS.Resource{:type => type} = record, device) do
+        device
+    end
+
+    def handle_device({:dns_rr, _, _, _, _, _, _, _, _, _} = record, device) do
+        device
+    end
+
+    def handle_device({:dns_rr_opt, _, _, _, _, _, _, _} = record, device) do
         device
     end
 
@@ -152,8 +203,7 @@ defmodule Mdns.Client do
         |> Enum.find(%Device{:ip => ip}, fn(device) ->
             device.ip == ip
         end)
-        rr(:inet_dns.msg(record, :anlist)) ++ rr(:inet_dns.msg(record, :arlist))
-        |> Enum.reduce(orig_device, fn(r, acc) -> handle_device(r, acc) end)
+        Enum.reduce(record.anlist ++ record.arlist, orig_device, fn(r, acc) -> handle_device(r, acc) end)
     end
 
     def create_namespace_devices(query, device, devices, state) do
@@ -174,17 +224,15 @@ defmodule Mdns.Client do
         end)
     end
 
-    def rr(resources) do
-        for resource <- resources, do: :maps.from_list(:inet_dns.rr(resource))
-    end
+    def send_service_response(services, state) do
+        cond do
+            length(services) > 0 ->
+                packet = %DNS.Record{@response_packet | :anlist => services}
+                Logger.debug("Sending Packet: #{inspect packet}")
+                :gen_udp.send(state.udp, @mdns_group, @port, DNS.Record.encode(packet))
+            true -> :nil
+        end
 
-    def other(record) do
-        header = :inet_dns.header(:inet_dns.msg(record, :header))
-        Logger.debug("Header: #{inspect header}")
-        record_type = :inet_dns.record_type(record)
-        Logger.debug("Record Type: #{inspect record_type}")
-        authorities = rr(:inet_dns.msg(record, :nslist))
-        Logger.debug("Authorities: #{inspect authorities}")
     end
 
 end
