@@ -38,11 +38,16 @@ defmodule Mdns.Client do
             queries: [],
             services: [
                 %{
-                    name: "_rosetta._tcp.local",
                     domain: "_nerves._tcp.local",
-                    data: "rosetta.local",
+                    data: "_rosetta._tcp.local",
                     ttl: 120,
-                    type: :ptr
+                    type: :ptr,
+                },
+                %{
+                    domain: "rosetta.local",
+                    data: {192, 168, 1, 112},
+                    ttl: 120,
+                    type: :a,
                 }
             ]
     end
@@ -129,26 +134,24 @@ defmodule Mdns.Client do
         Logger.debug("Got Query: #{inspect record}")
         Enum.flat_map(record.qdlist, fn(%DNS.Query{} = q) ->
             Enum.reduce(state.services, [], fn(service, answers) ->
+                data =
+                    case String.valid?(service.data) do
+                        true -> to_char_list(service.data)
+                        _ -> service.data
+                    end
                 cond do
                     service.domain == to_string(q.domain) ->
                         [%DNS.Resource{
                             class: :in,
                             type: service.type,
                             ttl: service.ttl,
-                            data: to_char_list(service.name),
+                            data: data,
                             domain: to_char_list(service.domain)
-                        },
-                        %DNS.Resource{
-                            class: :in,
-                            type: service.type,
-                            ttl: service.ttl,
-                            data: to_char_list(service.data),
-                            domain: to_char_list(service.name)
-                        }] ++ answers
+                        } | answers]
                     true -> answers
                 end
             end)
-        end) |> send_service_response(state)
+        end) |> send_service_response(record, state)
         state
     end
 
@@ -170,7 +173,7 @@ defmodule Mdns.Client do
     end
 
     def handle_device(%DNS.Resource{:type => :ptr} = record, device) do
-        %Device{device | :services => Enum.uniq([to_string(record.data) | device.services])}
+        %Device{device | :services => Enum.uniq([to_string(record.data), to_string(record.domain)] ++ device.services)}
     end
 
     def handle_device(%DNS.Resource{:type => :a} = record, device) do
@@ -224,7 +227,7 @@ defmodule Mdns.Client do
         end)
     end
 
-    def send_service_response(services, state) do
+    def send_service_response(services, record, state) do
         cond do
             length(services) > 0 ->
                 packet = %DNS.Record{@response_packet | :anlist => services}
