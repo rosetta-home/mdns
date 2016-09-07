@@ -30,26 +30,12 @@ defmodule Mdns.Client do
     ]
 
     defmodule State do
-        defstruct devices: %{:other => []},
+        defstruct devices: %{},
             udp: nil,
             events: nil,
             handlers: [],
-            ips: [],
             queries: [],
-            services: [
-                %{
-                    domain: "_nerves._tcp.local",
-                    data: "_rosetta._tcp.local",
-                    ttl: 120,
-                    type: :ptr,
-                },
-                %{
-                    domain: "rosetta.local",
-                    data: {192, 168, 1, 112},
-                    ttl: 120,
-                    type: :a,
-                }
-            ]
+            services: []
     end
 
     defmodule Device do
@@ -57,6 +43,13 @@ defmodule Mdns.Client do
             services: [],
             domain: nil,
             payload: %{}
+    end
+
+    defmodule Service do
+        defstruct domain: "_nerves._tcp.local",
+            data: "_myapp._tcp.local",
+            ttl: 120,
+            type: :ptr
     end
 
     def start_link do
@@ -71,14 +64,15 @@ defmodule Mdns.Client do
         GenServer.call(__MODULE__, :devices)
     end
 
+    def add_service(%Service{} = service) do
+        GenServer.call(__MODULE__, {:add_service, service})
+    end
+
     def add_handler(handler) do
         GenServer.call(__MODULE__, {:handler, handler})
     end
 
     def init(:ok) do
-        ips = Enum.map(elem(:inet.getif(), 1), fn(i) ->
-            elem(i, 0)
-        end)
         udp_options = [
             :binary,
             active:          true,
@@ -88,10 +82,9 @@ defmodule Mdns.Client do
             multicast_ttl:   255,
             reuseaddr:       true
         ]
-
         {:ok, events} = GenEvent.start_link([{:name, Mdns.Client.Events}])
         {:ok, udp} = :gen_udp.open(@port, udp_options)
-        {:ok, %State{:udp => udp, :events => events, :ips => ips}}
+        {:ok, %State{:udp => udp, :events => events}}
     end
 
     def handle_call({:handler, handler}, {pid, _} = from, state) do
@@ -109,6 +102,10 @@ defmodule Mdns.Client do
         ]}
         :gen_udp.send(state.udp, @mdns_group, @port, DNS.Record.encode(packet))
         {:reply, :ok,  %State{state | :queries => Enum.uniq([namespace | state.queries])}}
+    end
+
+    def handle_call({:add_service, service}, _from, state) do
+        {:reply, :ok, %State{state | :services => Enum.uniq([service | state.services])}}
     end
 
     def handle_info({:gen_event_EXIT, handler, reason}, state) do

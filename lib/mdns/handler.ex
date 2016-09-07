@@ -6,7 +6,7 @@ defmodule Mdns.Handler do
         {:ok, []}
     end
 
-    def handle_event({:device, device} = obj, parent) do
+    def handle_event({namespace, device} = obj, parent) do
         send(parent, obj)
         {:ok, parent}
     end
