@@ -8,12 +8,43 @@ A simple [mDNS](https://en.wikipedia.org/wiki/Multicast_DNS) client for device d
     2. mix do deps.get, deps.compile
     3. iex -S mix
 
-## Usage
+## Server Usage
+To add a service to the server call `Mdns.Client.add_service(%Mdns.Client.Service{})` an example service might looks like this.
+
+    Mdns.Client.add_service(%Mdns.Client.Service{
+        domain: "_nerves._tcp.local",
+        data: "_rosetta._tcp.local",
+        ttl: 120,
+        type: :ptr
+    })
+
+You can also add `:a` records so that your service is available from a web browser.
+
+    Mdns.Client.add_service(%Mdns.Client.Service{
+        domain: "rosetta.local",
+        data: {192, 168, 1, 112},
+        ttl: 120,
+        type: :a
+    })
+
+And `:txt` records as well.
+
+    Mdns.Client.add_service(%Mdns.Client.Service{
+        domain: "_nerves._tcp.local",
+        data: ["id=123123", "port=8800"],
+        ttl: 120,
+        type: :txt
+    })
+
+To see the server and client in action run `mix test` and view the code in `test/mdns_test.exs`
+
+
+## Client Usage
 To discover a device in a namespace call `Mdns.Client.query(namespace \\ "_services._dns-sd._udp.local")`. Compliant devices will respond with a DNS response. `Mdns.Client` will notify the event bus, available at `Mdns.Client.Events`, of any devices it finds.
 
 Calling `Mdns.Client.query("_googlecast._tcp.local")`
 
-assuming you have a Chromecast on your network, an event is broadcasted on `Mdns.Client.Events` that looks like this
+assuming you have a Chromecast on your network, an event is broadcast on `Mdns.Client.Events` that looks like this
 
     {:"_googlecast._tcp.local",
         %Mdns.Client.Device{
