@@ -3,7 +3,7 @@ defmodule Mdns.Mixfile do
 
   def project do
     [app: :mdns,
-     version: "0.1.1",
+     version: "0.1.2",
      elixir: "~> 1.3",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
@@ -17,14 +17,14 @@ defmodule Mdns.Mixfile do
   # Type "mix help compile.app" for more information
   def application do
     [
-        applications: [:logger],
+        applications: [:logger, :dns],
         mod: {Mdns, []}
     ]
   end
 
   def description do
       """
-      A simple mDNS (zeroconf, bonjour) client for device discovery on your local network.
+      A simple mDNS (zeroconf, bonjour) server and client for device discovery on your local network.
       """
   end
 
@@ -33,7 +33,7 @@ defmodule Mdns.Mixfile do
       name: :mdns,
       files: ["lib", "mix.exs", "README*", "LICENSE*"],
       maintainers: ["Christopher Steven Coté"],
-      licenses: ["MIT License"],
+      licenses: ["Apache License 2.0"],
       links: %{"GitHub" => "https://github.com/NationalAssociationOfRealtors/mdns",
           "Docs" => "https://github.com/NationalAssociationOfRealtors/mdns"}
     ]

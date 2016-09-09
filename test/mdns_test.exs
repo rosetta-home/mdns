@@ -8,19 +8,19 @@ defmodule MdnsTest do
 
     test "server and client events" do
         Mdns.Client.add_handler(Mdns.Handler)
-        Mdns.Client.add_service(%Mdns.Client.Service{
+        Mdns.Server.add_service(%Mdns.Server.Service{
             domain: "_nerves._tcp.local",
             data: "_rosetta._tcp.local",
             ttl: 120,
             type: :ptr
         })
-        Mdns.Client.add_service(%Mdns.Client.Service{
+        Mdns.Server.add_service(%Mdns.Server.Service{
             domain: "rosetta.local",
-            data: {192, 168, 1, 112},
+            data: {192, 168, 1, 4},
             ttl: 120,
             type: :a
         })
-        Mdns.Client.add_service(%Mdns.Client.Service{
+        Mdns.Server.add_service(%Mdns.Server.Service{
             domain: "_nerves._tcp.local",
             data: ["id=123123", "port=8800"],
             ttl: 120,

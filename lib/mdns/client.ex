@@ -9,16 +9,6 @@ defmodule Mdns.Client do
         qdlist: []
     }
 
-    @response_packet %DNS.Record{
-        header: %DNS.Header{
-            aa: true,
-            qr: true,
-            opcode: 0,
-            rcode: 0,
-        },
-        anlist: []
-    }
-
     @default_queries [
         %DNS.Query{domain: to_char_list("_services._dns-sd._udp.local"), type: :ptr, class: :in},
         %DNS.Query{domain: to_char_list("_http._tcp.local"), type: :ptr, class: :in},
@@ -34,8 +24,7 @@ defmodule Mdns.Client do
             udp: nil,
             events: nil,
             handlers: [],
-            queries: [],
-            services: []
+            queries: []
     end
 
     defmodule Device do
@@ -43,13 +32,6 @@ defmodule Mdns.Client do
             services: [],
             domain: nil,
             payload: %{}
-    end
-
-    defmodule Service do
-        defstruct domain: "_nerves._tcp.local",
-            data: "_myapp._tcp.local",
-            ttl: 120,
-            type: :ptr
     end
 
     def start_link do
@@ -62,10 +44,6 @@ defmodule Mdns.Client do
 
     def devices do
         GenServer.call(__MODULE__, :devices)
-    end
-
-    def add_service(%Service{} = service) do
-        GenServer.call(__MODULE__, {:add_service, service})
     end
 
     def add_handler(handler) do
@@ -104,10 +82,6 @@ defmodule Mdns.Client do
         {:reply, :ok,  %State{state | :queries => Enum.uniq([namespace | state.queries])}}
     end
 
-    def handle_call({:add_service, service}, _from, state) do
-        {:reply, :ok, %State{state | :services => Enum.uniq([service | state.services])}}
-    end
-
     def handle_info({:gen_event_EXIT, handler, reason}, state) do
         Enum.each(state.handlers, fn(h) ->
             GenEvent.add_mon_handler(state.events, elem(h, 0), elem(h, 1))
@@ -123,33 +97,8 @@ defmodule Mdns.Client do
         record = DNS.Record.decode(packet)
         case record.header.qr do
             true -> handle_response(ip, record, state)
-            false -> handle_query(ip, record, state)
+            _ -> state
         end
-    end
-
-    def handle_query(ip, record, state) do
-        Logger.debug("Got Query: #{inspect record}")
-        Enum.flat_map(record.qdlist, fn(%DNS.Query{} = q) ->
-            Enum.reduce(state.services, [], fn(service, answers) ->
-                data =
-                    case String.valid?(service.data) do
-                        true -> to_char_list(service.data)
-                        _ -> service.data
-                    end
-                cond do
-                    service.domain == to_string(q.domain) ->
-                        [%DNS.Resource{
-                            class: :in,
-                            type: service.type,
-                            ttl: service.ttl,
-                            data: data,
-                            domain: to_char_list(service.domain)
-                        } | answers]
-                    true -> answers
-                end
-            end)
-        end) |> send_service_response(record, state)
-        state
     end
 
     def handle_response(ip, record, state) do
@@ -223,16 +172,4 @@ defmodule Mdns.Client do
             end
         end)
     end
-
-    def send_service_response(services, record, state) do
-        cond do
-            length(services) > 0 ->
-                packet = %DNS.Record{@response_packet | :anlist => services}
-                Logger.debug("Sending Packet: #{inspect packet}")
-                :gen_udp.send(state.udp, @mdns_group, @port, DNS.Record.encode(packet))
-            true -> :nil
-        end
-
-    end
-
 end

@@ -9,9 +9,9 @@ A simple [mDNS](https://en.wikipedia.org/wiki/Multicast_DNS) client for device d
     3. iex -S mix
 
 ## Server Usage
-To add a service to the server call `Mdns.Client.add_service(%Mdns.Client.Service{})` an example service might looks like this.
+To add a service to the server call `Mdns.Server.add_service(%Mdns.Server.Service{})` an example service might looks like this.
 
-    Mdns.Client.add_service(%Mdns.Client.Service{
+    Mdns.Server.add_service(%Mdns.Server.Service{
         domain: "_nerves._tcp.local",
         data: "_rosetta._tcp.local",
         ttl: 120,
@@ -20,16 +20,16 @@ To add a service to the server call `Mdns.Client.add_service(%Mdns.Client.Servic
 
 You can also add `:a` records so that your service is available from a web browser.
 
-    Mdns.Client.add_service(%Mdns.Client.Service{
+    Mdns.Server.add_service(%Mdns.Server.Service{
         domain: "rosetta.local",
-        data: {192, 168, 1, 112},
+        data: {192, 168, 1, 4},
         ttl: 120,
         type: :a
     })
 
 And `:txt` records as well.
 
-    Mdns.Client.add_service(%Mdns.Client.Service{
+    Mdns.Server.add_service(%Mdns.Server.Service{
         domain: "_nerves._tcp.local",
         data: ["id=123123", "port=8800"],
         ttl: 120,
@@ -37,6 +37,21 @@ And `:txt` records as well.
     })
 
 To see the server and client in action run `mix test` and view the code in `test/mdns_test.exs`
+
+Once an `:a` record has been added(with the correct ip) you should be able to run `ping rosetta.local`
+
+    :~$ ping rosetta.local
+    PING rosetta.local (192.168.1.4) 56(84) bytes of data.
+    64 bytes from 192.168.1.4: icmp_seq=1 ttl=64 time=0.279 ms
+    64 bytes from 192.168.1.4: icmp_seq=2 ttl=64 time=0.261 ms
+    64 bytes from 192.168.1.4: icmp_seq=3 ttl=64 time=0.329 ms
+    64 bytes from 192.168.1.4: icmp_seq=4 ttl=64 time=0.270 ms
+    64 bytes from 192.168.1.4: icmp_seq=5 ttl=64 time=0.227 ms
+    64 bytes from 192.168.1.4: icmp_seq=6 ttl=64 time=0.215 ms
+    ^C
+    --- rosetta.local ping statistics ---
+    6 packets transmitted, 6 received, 0% packet loss, time 4998ms
+    rtt min/avg/max/mdev = 0.215/0.263/0.329/0.040 ms
 
 
 ## Client Usage
