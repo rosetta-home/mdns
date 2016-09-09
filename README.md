@@ -9,6 +9,8 @@ A simple [mDNS](https://en.wikipedia.org/wiki/Multicast_DNS) client for device d
     3. iex -S mix
 
 ## Server Usage
+The udp server doesn't start automatically, this gives you a chance to bring up your network interface, before starting the server, especially useful when using this with Nerves. To start the server, call `Mdns.Server.start`. To handle `:a` record requests you will want to set the ip address. This can change periodically, or you may have multiple interfaces. Set or update the ip address used for query responses by calling `Mdns.Server.set_ip({192, 168, 1, 4})`.
+
 To add a service to the server call `Mdns.Server.add_service(%Mdns.Server.Service{})` an example service might looks like this.
 
     Mdns.Server.add_service(%Mdns.Server.Service{
@@ -18,11 +20,11 @@ To add a service to the server call `Mdns.Server.add_service(%Mdns.Server.Servic
         type: :ptr
     })
 
-You can also add `:a` records so that your service is available from a web browser.
+You can also add `:a` records so that your service is available from a web browser or pingable. In order to use the ip address set by calling `Mdns.Server.set_ip` in responses, use the `:ip` atom for the value of your data attribute in the `Mdns.Server.Service` struct.
 
     Mdns.Server.add_service(%Mdns.Server.Service{
         domain: "rosetta.local",
-        data: {192, 168, 1, 4},
+        data: :ip, #this is a special atom that uses the ip address set when calling Mdns.Server.set_ip
         ttl: 120,
         type: :a
     })
@@ -55,7 +57,7 @@ Once an `:a` record has been added(with the correct ip) you should be able to ru
 
 
 ## Client Usage
-To discover a device in a namespace call `Mdns.Client.query(namespace \\ "_services._dns-sd._udp.local")`. Compliant devices will respond with a DNS response. `Mdns.Client` will notify the event bus, available at `Mdns.Client.Events`, of any devices it finds.
+Start the client by calling `Mdns.Client.start`, again, this gives the system an oppurtunity to bring up the network interface. To discover a device in a namespace call `Mdns.Client.query(namespace \\ "_services._dns-sd._udp.local")`. Compliant devices will respond with a DNS response. `Mdns.Client` will notify the event bus, available at `Mdns.Client.Events`, of any devices it finds. You can add an event handler by calling `Mdns.Client.add_handler`. See `Mdns.Handler` for an example event handler.
 
 Calling `Mdns.Client.query("_googlecast._tcp.local")`
 

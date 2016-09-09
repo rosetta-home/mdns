@@ -50,7 +50,16 @@ defmodule Mdns.Client do
         GenServer.call(__MODULE__, {:handler, handler})
     end
 
+    def start do
+        GenServer.call(__MODULE__, :start)
+    end
+
     def init(:ok) do
+        {:ok, events} = GenEvent.start_link([{:name, Mdns.Client.Events}])
+        {:ok, %State{:events => events}}
+    end
+
+    def handle_call(:start, _from, state) do
         udp_options = [
             :binary,
             active:          true,
@@ -60,9 +69,8 @@ defmodule Mdns.Client do
             multicast_ttl:   255,
             reuseaddr:       true
         ]
-        {:ok, events} = GenEvent.start_link([{:name, Mdns.Client.Events}])
         {:ok, udp} = :gen_udp.open(@port, udp_options)
-        {:ok, %State{:udp => udp, :events => events}}
+        {:reply, :ok, %State{state | udp: udp}}
     end
 
     def handle_call({:handler, handler}, {pid, _} = from, state) do

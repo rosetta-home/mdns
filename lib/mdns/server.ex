@@ -17,7 +17,8 @@ defmodule Mdns.Server do
 
     defmodule State do
         defstruct udp: nil,
-            services: []
+            services: [],
+            ip: {0,0,0,0}
     end
 
     defmodule Service do
@@ -35,7 +36,19 @@ defmodule Mdns.Server do
         GenServer.call(__MODULE__, {:add_service, service})
     end
 
+    def set_ip(ip) do
+        GenServer.call(__MODULE__, {:ip, ip})
+    end
+
+    def start do
+        GenServer.call(__MODULE__, :start)
+    end
+
     def init(:ok) do
+        {:ok, %State{}}
+    end
+
+    def handle_call(:start, _from, state) do
         udp_options = [
             :binary,
             active:          true,
@@ -46,7 +59,11 @@ defmodule Mdns.Server do
             reuseaddr:       true
         ]
         {:ok, udp} = :gen_udp.open(@port, udp_options)
-        {:ok, %State{:udp => udp}}
+        {:reply, :ok, %State{state | udp: udp}}
+    end
+
+    def handle_call({:ip, ip}, _from, state) do
+        {:reply, :ok, %State{state | ip: ip}}
     end
 
     def handle_call({:add_service, service}, _from, state) do
@@ -72,9 +89,13 @@ defmodule Mdns.Server do
                 cond do
                     service.domain == to_string(q.domain) ->
                         data =
-                            case String.valid?(service.data) do
-                                true -> to_char_list(service.data)
-                                _ -> service.data
+                            case service.data do
+                                :ip -> state.ip
+                                _ ->
+                                    case String.valid?(service.data) do
+                                        true -> to_char_list(service.data)
+                                        _ -> service.data
+                                    end
                             end
                         [%DNS.Resource{
                             class: :in,
