@@ -39,7 +39,7 @@ defmodule Mdns.Client do
     end
 
     def query(namespace \\ "_services._dns-sd._udp.local") do
-        GenServer.call(__MODULE__, {:query, namespace})
+        GenServer.cast(__MODULE__, {:query, namespace})
     end
 
     def devices do
@@ -82,12 +82,12 @@ defmodule Mdns.Client do
         {:reply, state.devices, state}
     end
 
-    def handle_call({:query, namespace}, _from, state) do
+    def handle_cast({:query, namespace}, state) do
         packet = %DNS.Record{@query_packet | :qdlist => [
             %DNS.Query{domain: to_char_list(namespace), type: :ptr, class: :in}
         ]}
         :gen_udp.send(state.udp, @mdns_group, @port, DNS.Record.encode(packet))
-        {:reply, :ok,  %State{state | :queries => Enum.uniq([namespace | state.queries])}}
+        {:noreply,  %State{state | :queries => Enum.uniq([namespace | state.queries])}}
     end
 
     def handle_info({:gen_event_EXIT, handler, reason}, state) do
