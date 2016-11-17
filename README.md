@@ -57,11 +57,11 @@ Once an `:a` record has been added(with the correct ip) you should be able to ru
 
 
 ## Client Usage
-Start the client by calling `Mdns.Client.start`, again, this gives the system an oppurtunity to bring up the network interface. To discover a device in a namespace call `Mdns.Client.query(namespace \\ "_services._dns-sd._udp.local")`. Compliant devices will respond with a DNS response. `Mdns.Client` will notify the event bus, available at `Mdns.Client.Events`, of any devices it finds. You can add an event handler by calling `Mdns.Client.add_handler`. See `Mdns.Handler` for an example event handler.
+Start the client by calling `Mdns.Client.start`, again, this gives the system an oppurtunity to bring up the network interface. To discover a device in a namespace call `Mdns.Client.query(namespace \\ "_services._dns-sd._udp.local")`. Compliant devices will respond with a DNS response. `Mdns.Client` will notify the event bus, available at `Mdns.Events`, of any devices it finds. You can add an event handler by calling `Mdns.EventManager.add_handler`. See `Mdns.Handler` for an example event handler.
 
 Calling `Mdns.Client.query("_googlecast._tcp.local")`
 
-assuming you have a Chromecast on your network, an event is broadcast on `Mdns.Client.Events` that looks like this
+assuming you have a Chromecast on your network, an event is broadcast on `Mdns.Events` that looks like this
 
     {:"_googlecast._tcp.local",
         %Mdns.Client.Device{

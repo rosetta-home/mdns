@@ -22,7 +22,6 @@ defmodule Mdns.Client do
     defmodule State do
         defstruct devices: %{},
             udp: nil,
-            events: nil,
             handlers: [],
             queries: []
     end
@@ -46,17 +45,12 @@ defmodule Mdns.Client do
         GenServer.call(__MODULE__, :devices)
     end
 
-    def add_handler(handler) do
-        GenServer.call(__MODULE__, {:handler, handler})
-    end
-
     def start do
         GenServer.call(__MODULE__, :start)
     end
 
     def init(:ok) do
-        {:ok, events} = GenEvent.start_link([{:name, Mdns.Client.Events}])
-        {:ok, %State{:events => events}}
+        {:ok, %State{}}
     end
 
     def handle_call(:start, _from, state) do
@@ -73,11 +67,6 @@ defmodule Mdns.Client do
         {:reply, :ok, %State{state | udp: udp}}
     end
 
-    def handle_call({:handler, handler}, {pid, _} = from, state) do
-        GenEvent.add_mon_handler(state.events, handler, pid)
-        {:reply, :ok, %{state | :handlers => [{handler, pid} | state.handlers]}}
-    end
-
     def handle_call(:devices, _from, state) do
         {:reply, state.devices, state}
     end
@@ -88,13 +77,6 @@ defmodule Mdns.Client do
         ]}
         :gen_udp.send(state.udp, @mdns_group, @port, DNS.Record.encode(packet))
         {:noreply,  %State{state | :queries => Enum.uniq([namespace | state.queries])}}
-    end
-
-    def handle_info({:gen_event_EXIT, handler, reason}, state) do
-        Enum.each(state.handlers, fn(h) ->
-            GenEvent.add_mon_handler(state.events, elem(h, 0), elem(h, 1))
-        end)
-        {:noreply, state}
     end
 
     def handle_info({:udp, socket, ip, port, packet}, state) do
@@ -117,7 +99,7 @@ defmodule Mdns.Client do
                 cond do
                     Enum.any?(device.services, fn(service) -> String.ends_with?(service, query) end) ->
                         {namespace, devices} = create_namespace_devices(query, device, acc, state)
-                        GenEvent.notify(state.events, {namespace, device})
+                        GenEvent.notify(Mdns.Events, {namespace, device})
                         Logger.debug("Device: #{inspect {namespace, device}}")
                         devices
                     true -> Map.merge(acc, state.devices)

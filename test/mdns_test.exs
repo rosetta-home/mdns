@@ -9,7 +9,7 @@ defmodule MdnsTest do
     test "server and client events" do
         Mdns.Server.start
         Mdns.Client.start
-        Mdns.Client.add_handler(Mdns.Handler)
+        Mdns.EventManager.add_handler(Mdns.Handler)
         Mdns.Server.set_ip {192, 168, 1, 4}
         Mdns.Server.add_service(%Mdns.Server.Service{
             domain: "_nerves._tcp.local",
