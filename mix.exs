@@ -4,7 +4,7 @@ defmodule Mdns.Mixfile do
   def project do
     [app: :mdns,
      version: "0.1.5",
-     elixir: "~> 1.3",
+     elixir: "~> 1.4",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
      description: description(),
@@ -16,10 +16,8 @@ defmodule Mdns.Mixfile do
   #
   # Type "mix help compile.app" for more information
   def application do
-    [
-        applications: [:logger, :dns],
-        mod: {Mdns, []}
-    ]
+    [extra_applications: [:logger],
+     mod: {Mdns, []}]
   end
 
   def description do
@@ -40,7 +38,7 @@ defmodule Mdns.Mixfile do
   end
 
   defp deps do
-    [{:dns, "~> 0.0.4"},
+    [{:dns, github: "mobileoverlord/elixir-dns", branch: "v0.1.0"},
     {:ex_doc, ">= 0.0.0", only: :dev}]
   end
 end
