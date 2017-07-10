@@ -9,6 +9,7 @@ defmodule Mdns.Client do
       qdlist: []
   }
 
+  # Commenting these out as they are not used right now
   # @default_queries [
   #     %DNS.Query{domain: to_char_list("_services._dns-sd._udp.local"), type: :ptr, class: :in},
   #     %DNS.Query{domain: to_char_list("_http._tcp.local"), type: :ptr, class: :in},

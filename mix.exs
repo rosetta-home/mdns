@@ -39,6 +39,6 @@ defmodule Mdns.Mixfile do
 
   defp deps do
     [{:dns, "~> 1.0"},
-    {:ex_doc, ">= 0.0.0", only: :dev}]
+     {:ex_doc, ">= 0.0.0", only: :dev}]
   end
 end
