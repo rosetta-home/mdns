@@ -38,7 +38,7 @@ defmodule Mdns.Mixfile do
   end
 
   defp deps do
-    [{:dns, github: "mobileoverlord/elixir-dns", branch: "v0.1.0"},
+    [{:dns, "~> 1.0"},
     {:ex_doc, ">= 0.0.0", only: :dev}]
   end
 end
