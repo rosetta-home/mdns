@@ -9,9 +9,10 @@ defmodule MdnsTest do
     |> Enum.find(fn {_interface, attr} ->
       Logger.debug("#{inspect attr}")
       case attr |> Keyword.get(:addr) do
-        {127, 0, 0, 1} -> false
         nil -> false
-        _ -> true
+        {127, 0, 0, 1} -> false
+        {_, _, _, _, _, _, _, _} -> false
+        {_, _, _, _} -> true
       end
     end)
     |> elem(1)
