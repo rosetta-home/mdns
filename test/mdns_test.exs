@@ -1,39 +1,57 @@
 defmodule MdnsTest do
-    use ExUnit.Case
-    doctest Mdns
+  use ExUnit.Case
+  require Logger
+  doctest Mdns
 
-    test "the truth" do
-        assert 1 + 1 == 2
-    end
+  def get_address() do
+    :inet.getifaddrs()
+    |> elem(1)
+    |> Enum.find(fn {_interface, attr} ->
+      case attr do
+        [flags: [:up, :broadcast, :running, :multicast], hwaddr: _, addr: _, netmask: _, broadaddr: _, addr: _, netmask: _] -> true
+        _ -> false
+      end
+    end)
+    |> elem(1)
+    |> Keyword.fetch(:addr)
+    |> elem(1)
+  end
 
-    test "server and client events" do
-        Mdns.Server.start
-        Mdns.Client.start
-        Mdns.EventManager.add_handler(Mdns.Handler)
-        Mdns.Server.set_ip {192, 168, 1, 4}
-        Mdns.Server.add_service(%Mdns.Server.Service{
-            domain: "_nerves._tcp.local",
-            data: "_rosetta._tcp.local",
-            ttl: 120,
-            type: :ptr
-        })
-        Mdns.Server.add_service(%Mdns.Server.Service{
-            domain: "rosetta.local",
-            data: :ip,
-            ttl: 120,
-            type: :a
-        })
-        Mdns.Server.add_service(%Mdns.Server.Service{
-            domain: "_nerves._tcp.local",
-            data: ["id=123123", "port=8800"],
-            ttl: 120,
-            type: :txt
-        })
+  def random_string(length) do
+    :crypto.strong_rand_bytes(length) |> Base.url_encode64 |> binary_part(0, length)
+  end
 
-        Mdns.Client.query("_nerves._tcp.local")
-        Mdns.Client.query("rosetta.local")
+  test "client and server" do
+    Logger.debug "Testing Server"
+    address = get_address()
+    Logger.debug "#{inspect address}"
+    host_name = "#{random_string(10)}.local"
+    Logger.debug("Address: #{inspect address}")
+    Logger.debug("Hostname: #{host_name}")
+    Mdns.Server.start
+    Mdns.EventManager.add_handler(Mdns.Handler)
+    Mdns.Server.set_ip address
+    Mdns.Server.add_service(%Mdns.Server.Service{
+      domain: host_name,
+      data: :ip,
+      ttl: 10,
+      type: :a
+    })
+    char_host =  host_name |> String.to_charlist()
+    lookup = :inet.gethostbyname(char_host, :inet)
+    Logger.debug("#{inspect lookup}")
+    assert {:ok, {:hostent, char_host , [], :inet, 4, [address]}} = lookup
 
-        assert_receive {:"_nerves._tcp.local", device}, 10_000
+    Logger.debug "Testing Client"
+    Mdns.Client.start
+    Mdns.Server.add_service(%Mdns.Server.Service{
+      domain: "_nerves._tcp.local",
+      data: "_rosetta._tcp.local",
+      ttl: 10,
+      type: :ptr
+    })
+    Mdns.Client.query("_nerves._tcp.local")
+    assert_receive {:"_nerves._tcp.local", %Mdns.Client.Device{ip: address}}, 10_000
 
-    end
+  end
 end
