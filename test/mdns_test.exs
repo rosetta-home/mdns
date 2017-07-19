@@ -7,9 +7,11 @@ defmodule MdnsTest do
     :inet.getifaddrs()
     |> elem(1)
     |> Enum.find(fn {_interface, attr} ->
-      case attr do
-        [flags: [:up, :broadcast, :running, :multicast], hwaddr: _, addr: _, netmask: _, broadaddr: _, addr: _, netmask: _] -> true
-        _ -> false
+      Logger.debug("#{inspect attr}")
+      case attr |> Keyword.get(:addr) do
+        {127, 0, 0, 1} -> false
+        nil -> false
+        _ -> true
       end
     end)
     |> elem(1)
