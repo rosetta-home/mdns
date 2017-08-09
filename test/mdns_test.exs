@@ -6,18 +6,26 @@ defmodule MdnsTest do
   def get_address() do
     :inet.getifaddrs()
     |> elem(1)
-    |> Enum.find(fn {_interface, attr} ->
-      Logger.debug("#{inspect attr}")
-      case attr |> Keyword.get(:addr) do
-        nil -> false
-        {127, 0, 0, 1} -> false
-        {_, _, _, _, _, _, _, _} -> false
-        {_, _, _, _} -> true
+    |> Enum.reduce_while({}, fn {_interface, attr}, acc ->
+      case attr |> get_ipv4 do
+        false -> {:cont, acc}
+        {} -> {:cont, acc}
+        {_, _, _, _} = add-> {:halt, add}
       end
     end)
-    |> elem(1)
-    |> Keyword.fetch(:addr)
-    |> elem(1)
+  end
+
+  def get_ipv4(attr) do
+    case attr |> Keyword.get_values(:addr) do
+      [] -> false
+      l -> l |> Enum.reduce_while({}, fn ip, acc ->
+        case ip do
+          {127, 0, 0, 1} -> {:cont, acc}
+          {_, _, _, _, _, _, _, _} -> {:cont, acc}
+          {_, _, _, _} = add -> {:halt, add}
+        end
+      end)
+    end
   end
 
   def random_string(length) do
