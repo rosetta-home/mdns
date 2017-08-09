@@ -78,9 +78,15 @@ defmodule Mdns.Client do
 
   def handle_cast({:query, namespace}, state) do
     packet = %DNS.Record{@query_packet | :qdlist => [
-        %DNS.Query{domain: to_char_list(namespace), type: :ptr, class: :in}
+      %DNS.Query{domain: to_char_list(namespace), type: :ptr, class: :in}
     ]}
-    :gen_udp.send(state.udp, @mdns_group, @port, DNS.Record.encode(packet))
+    Task.start(fn ->
+      p = DNS.Record.encode(packet)
+      0..5 |> Enum.each(fn _i ->
+        :gen_udp.send(state.udp, @mdns_group, @port, p)
+        :timer.sleep(10)
+      end)
+    end)
     {:noreply,  %State{state | :queries => Enum.uniq([namespace | state.queries])}}
   end
 
