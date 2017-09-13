@@ -64,7 +64,7 @@ defmodule Mdns.Client do
         add_membership:  {@mdns_group, {0,0,0,0}},
         multicast_if:    {0,0,0,0},
         multicast_loop:  true,
-        multicast_ttl:   255,
+        multicast_ttl:   32,
         reuseaddr:       true
     ]
 
@@ -80,13 +80,8 @@ defmodule Mdns.Client do
     packet = %DNS.Record{@query_packet | :qdlist => [
       %DNS.Query{domain: to_char_list(namespace), type: :ptr, class: :in}
     ]}
-    Task.start(fn ->
-      p = DNS.Record.encode(packet)
-      0..5 |> Enum.each(fn _i ->
-        :gen_udp.send(state.udp, @mdns_group, @port, p)
-        :timer.sleep(10)
-      end)
-    end)
+    p = DNS.Record.encode(packet)
+    :gen_udp.send(state.udp, @mdns_group, @port, p)
     {:noreply,  %State{state | :queries => Enum.uniq([namespace | state.queries])}}
   end
 
