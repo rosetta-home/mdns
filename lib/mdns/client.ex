@@ -11,13 +11,13 @@ defmodule Mdns.Client do
 
   # Commenting these out as they are not used right now
   # @default_queries [
-  #     %DNS.Query{domain: to_char_list("_services._dns-sd._udp.local"), type: :ptr, class: :in},
-  #     %DNS.Query{domain: to_char_list("_http._tcp.local"), type: :ptr, class: :in},
-  #     %DNS.Query{domain: to_char_list("_googlecast._tcp.local"), type: :ptr, class: :in},
-  #     %DNS.Query{domain: to_char_list("_workstation._tcp.local"), type: :ptr, class: :in},
-  #     %DNS.Query{domain: to_char_list("_sftp-ssh._tcp.local"), type: :ptr, class: :in},
-  #     %DNS.Query{domain: to_char_list("_ssh._tcp.local"), type: :ptr, class: :in},
-  #     %DNS.Query{domain: to_char_list("b._dns-sd._udp.local"), type: :ptr, class: :in},
+  #     %DNS.Query{domain: to_charlist("_services._dns-sd._udp.local"), type: :ptr, class: :in},
+  #     %DNS.Query{domain: to_charlist("_http._tcp.local"), type: :ptr, class: :in},
+  #     %DNS.Query{domain: to_charlist("_googlecast._tcp.local"), type: :ptr, class: :in},
+  #     %DNS.Query{domain: to_charlist("_workstation._tcp.local"), type: :ptr, class: :in},
+  #     %DNS.Query{domain: to_charlist("_sftp-ssh._tcp.local"), type: :ptr, class: :in},
+  #     %DNS.Query{domain: to_charlist("_ssh._tcp.local"), type: :ptr, class: :in},
+  #     %DNS.Query{domain: to_charlist("b._dns-sd._udp.local"), type: :ptr, class: :in},
   # ]
 
   defmodule State do
@@ -78,7 +78,7 @@ defmodule Mdns.Client do
 
   def handle_cast({:query, namespace}, state) do
     packet = %DNS.Record{@query_packet | :qdlist => [
-        %DNS.Query{domain: to_char_list(namespace), type: :ptr, class: :in}
+        %DNS.Query{domain: to_charlist(namespace), type: :ptr, class: :in}
     ]}
     :gen_udp.send(state.udp, @mdns_group, @port, DNS.Record.encode(packet))
     {:noreply,  %State{state | :queries => Enum.uniq([namespace | state.queries])}}
@@ -124,7 +124,7 @@ defmodule Mdns.Client do
   def handle_device({:dns_rr, _d, :txt, _id, _, _, data, _, _, _}, device) do
     %Device{device | :payload => Enum.reduce(data, %{}, fn(kv, acc) ->
       case String.split(to_string(kv), "=", parts: 2) do
-        [k, v] -> Map.put(acc, String.downcase(k), String.strip(v))
+        [k, v] -> Map.put(acc, String.downcase(k), String.trim(v))
         _ -> nil
       end
     end)}

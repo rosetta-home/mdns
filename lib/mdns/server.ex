@@ -105,7 +105,7 @@ defmodule Mdns.Server do
                 :ip -> state.ip
                 _ ->
                   case String.valid?(service.data) do
-                    true -> to_char_list(service.data)
+                    true -> to_charlist(service.data)
                     _ -> service.data
                   end
               end
@@ -114,7 +114,7 @@ defmodule Mdns.Server do
                 type: service.type,
                 ttl: service.ttl,
                 data: data,
-                domain: to_char_list(service.domain)
+                domain: to_charlist(service.domain)
             } | answers]
           true -> answers
         end
