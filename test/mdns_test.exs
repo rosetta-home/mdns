@@ -40,7 +40,6 @@ defmodule MdnsTest do
     Logger.debug("Address: #{inspect address}")
     Logger.debug("Hostname: #{host_name}")
     Mdns.Server.start
-    Mdns.EventManager.add_handler(Mdns.Handler)
     Mdns.Server.set_ip address
     Mdns.Server.add_service(%Mdns.Server.Service{
       domain: host_name,
@@ -55,6 +54,7 @@ defmodule MdnsTest do
 
     Logger.debug "Testing Client"
     Mdns.Client.start
+    Mdns.EventManager.register()
     Mdns.Server.add_service(%Mdns.Server.Service{
       domain: "_nerves._tcp.local",
       data: "_rosetta._tcp.local",
@@ -63,6 +63,5 @@ defmodule MdnsTest do
     })
     Mdns.Client.query("_nerves._tcp.local")
     assert_receive {:"_nerves._tcp.local", %Mdns.Client.Device{ip: address}}, 10_000
-
   end
 end

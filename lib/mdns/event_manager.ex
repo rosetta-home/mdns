@@ -1,29 +1,41 @@
 defmodule Mdns.EventManager do
   use GenServer
+  require Logger
 
-  def start_link() do
+  def add_handler() do
+    GenServer.call(__MODULE__, :add_handler)
+  end
+
+  def register() do
+    GenServer.call(__MODULE__, :add_handler)
+  end
+
+  def notify(message) do
+    GenServer.call(__MODULE__, {:notify, message})
+  end
+
+  def start_link do
     GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
   end
 
   def init(:ok) do
-    {:ok, events} = GenEvent.start_link([{:name, Mdns.Events}])
-    {:ok, %{:handlers => [], :events => events}}
+    {:ok, %{}}
   end
 
-  def add_handler(handler) do
-    GenServer.call(__MODULE__, {:handler, handler})
+  def handle_call(:add_handler, {pid, _ref}, state) do
+    Registry.register(Mdns.EventManager.Registry, Mdns, pid)
+    {:reply, :ok, state}
   end
 
-  def handle_call({:handler, handler}, {pid, _}, state) do
-    GenEvent.add_mon_handler(Mdns.Events, handler, pid)
-    {:reply, :ok, %{state | :handlers => [{handler, pid} | state.handlers]}}
+  def handle_call({:notify, message}, _from, state) do
+    Logger.debug "mDNS Dispatching: #{inspect message}"
+    case Registry.lookup(Mdns.EventManager.Registry, Mdns) do
+      [] -> Logger.debug "No Registrations for Mdns"
+      _ ->
+        Registry.dispatch(Mdns.EventManager.Registry, Mdns, fn entries ->
+          for {_module, pid} <- entries, do: send(pid, message)
+        end)
+    end
+    {:reply, message, state}
   end
-
-  def handle_info({:gen_event_EXIT, _handler, _reason}, state) do
-    Enum.each(state.handlers, fn(h) ->
-      GenEvent.add_mon_handler(Mdns.Events, elem(h, 0), elem(h, 1))
-    end)
-    {:noreply, state}
-  end
-
 end

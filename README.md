@@ -14,7 +14,7 @@ The udp server doesn't start automatically, this gives you a chance to bring up 
 To add a service to the server call `Mdns.Server.add_service(%Mdns.Server.Service{})` an example service might looks like this.
 
     Mdns.Server.add_service(%Mdns.Server.Service{
-        domain: "_nerves._tcp.local",
+        domain: "nerves.local",
         data: "_rosetta._tcp.local",
         ttl: 120,
         type: :ptr
@@ -57,11 +57,11 @@ Once an `:a` record has been added(with the correct ip) you should be able to ru
 
 
 ## Client Usage
-Start the client by calling `Mdns.Client.start`, again, this gives the system an oppurtunity to bring up the network interface. To discover a device in a namespace call `Mdns.Client.query(namespace \\ "_services._dns-sd._udp.local")`. Compliant devices will respond with a DNS response. `Mdns.Client` will notify the event bus, available at `Mdns.Events`, of any devices it finds. You can add an event handler by calling `Mdns.EventManager.add_handler`. See `Mdns.Handler` for an example event handler.
+Start the client by calling `Mdns.Client.start`, again, this gives the system an opportunity to bring up the network interface. To discover a device in a namespace call `Mdns.Client.query(namespace \\ "_services._dns-sd._udp.local")`. Compliant devices will respond with a DNS response. `Mdns.Client` will send notify the Mdns `Registry`  You can add an event handler by calling `Mdns.EventManager.add_handler` or `Mdns.EventManager.register`. This will send a message to the process that called `Mdns.EventManager.add_handler` or `Mdns.EventManager.register`. You should handle this message in a `handle_info` callback.
 
 Calling `Mdns.Client.query("_googlecast._tcp.local")`
 
-assuming you have a Chromecast on your network, an event is broadcast on `Mdns.Events` that looks like this
+assuming you have a Chromecast on your network, an event is broadcast that looks like this
 
     {:"_googlecast._tcp.local",
         %Mdns.Client.Device{

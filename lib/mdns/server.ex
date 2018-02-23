@@ -3,7 +3,7 @@ defmodule Mdns.Server do
   require Logger
 
   @mdns_group {224,0,0,251}
-  @port 5353
+  @port Application.get_env(:mdns, :port, 5353)
 
   @response_packet %DNS.Record{
     header: %DNS.Header{

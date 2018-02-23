@@ -3,22 +3,12 @@ defmodule Mdns.Client do
   require Logger
 
   @mdns_group {224,0,0,251}
-  @port 5353
+  @port Application.get_env(:mdns, :port, 5353)
+
   @query_packet %DNS.Record{
       header: %DNS.Header{},
       qdlist: []
   }
-
-  # Commenting these out as they are not used right now
-  # @default_queries [
-  #     %DNS.Query{domain: to_charlist("_services._dns-sd._udp.local"), type: :ptr, class: :in},
-  #     %DNS.Query{domain: to_charlist("_http._tcp.local"), type: :ptr, class: :in},
-  #     %DNS.Query{domain: to_charlist("_googlecast._tcp.local"), type: :ptr, class: :in},
-  #     %DNS.Query{domain: to_charlist("_workstation._tcp.local"), type: :ptr, class: :in},
-  #     %DNS.Query{domain: to_charlist("_sftp-ssh._tcp.local"), type: :ptr, class: :in},
-  #     %DNS.Query{domain: to_charlist("_ssh._tcp.local"), type: :ptr, class: :in},
-  #     %DNS.Query{domain: to_charlist("b._dns-sd._udp.local"), type: :ptr, class: :in},
-  # ]
 
   defmodule State do
     defstruct devices: %{},
@@ -105,7 +95,7 @@ defmodule Mdns.Client do
         cond do
           Enum.any?(device.services, fn(service) -> String.ends_with?(service, query) end) ->
             {namespace, devices} = create_namespace_devices(query, device, acc, state)
-            GenEvent.notify(Mdns.Events, {namespace, device})
+            Mdns.EventManager.notify({namespace, device})
             Logger.debug("Device: #{inspect {namespace, device}}")
             devices
           true -> Map.merge(acc, state.devices)

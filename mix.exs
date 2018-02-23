@@ -3,8 +3,8 @@ defmodule Mdns.Mixfile do
 
   def project do
     [app: :mdns,
-     version: "0.1.7",
-     elixir: "~> 1.4",
+     version: "1.0.0",
+     elixir: "~> 1.5",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
      description: description(),
@@ -17,7 +17,9 @@ defmodule Mdns.Mixfile do
   # Type "mix help compile.app" for more information
   def application do
     [extra_applications: [:logger],
-     mod: {Mdns, []}]
+      mod: {Mdns, []},
+      env: [port: 5353]
+   ]
   end
 
   def description do

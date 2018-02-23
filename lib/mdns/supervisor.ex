@@ -7,6 +7,7 @@ defmodule Mdns.Supervisor do
 
   def init(:ok) do
     children = [
+      supervisor(Registry, [:duplicate, Mdns.EventManager.Registry, []]),
       worker(Mdns.EventManager, []),
       worker(Mdns.Client, []),
       worker(Mdns.Server, []),
