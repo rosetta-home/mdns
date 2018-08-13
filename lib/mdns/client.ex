@@ -88,7 +88,7 @@ defmodule Mdns.Client do
   end
 
   def handle_response(ip, record, state) do
-    Logger.debug("Got Response: #{inspect record}")
+    Logger.debug("mDNS got response: #{inspect record}")
     device = get_device(ip, record, state)
     devices =
       Enum.reduce(state.queries, %{:other => []}, fn(query, acc) ->
@@ -96,7 +96,7 @@ defmodule Mdns.Client do
           Enum.any?(device.services, fn(service) -> String.ends_with?(service, query) end) ->
             {namespace, devices} = create_namespace_devices(query, device, acc, state)
             Mdns.EventManager.notify({namespace, device})
-            Logger.debug("Device: #{inspect {namespace, device}}")
+            Logger.debug("mDNS device: #{inspect {namespace, device}}")
             devices
           true -> Map.merge(acc, state.devices)
         end
