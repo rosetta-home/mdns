@@ -28,7 +28,7 @@ defmodule Mdns.EventManager do
   end
 
   def handle_call({:notify, message}, _from, state) do
-    Logger.debug "mDNS Dispatching: #{inspect message}"
+    Logger.debug "mDNS dispatching: #{inspect message}"
     case Registry.lookup(Mdns.EventManager.Registry, Mdns) do
       [] -> Logger.debug "No Registrations for Mdns"
       _ ->
