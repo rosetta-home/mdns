@@ -95,7 +95,7 @@ defmodule Mdns.Server do
   end
 
   def handle_query(_ip, record, state) do
-    // Logger.debug("mDNS got query: #{inspect record}")
+    # Logger.debug("mDNS got query: #{inspect record}")
     Enum.flat_map(record.qdlist, fn(%DNS.Query{} = q) ->
       Enum.reduce(state.services, [], fn(service, answers) ->
         cond do
