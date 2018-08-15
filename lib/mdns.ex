@@ -3,6 +3,6 @@ defmodule Mdns do
   require Logger
 
   def start(_type, _args) do
-    Mdns.Supervisor.start_link
+    Mdns.Supervisor.start_link()
   end
 end

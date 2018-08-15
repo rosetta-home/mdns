@@ -28,14 +28,18 @@ defmodule Mdns.EventManager do
   end
 
   def handle_call({:notify, message}, _from, state) do
-    Logger.debug "mDNS dispatching: #{inspect message}"
+    Logger.debug("mDNS dispatching: #{inspect(message)}")
+
     case Registry.lookup(Mdns.EventManager.Registry, Mdns) do
-      [] -> Logger.debug "No Registrations for Mdns"
+      [] ->
+        Logger.debug("No Registrations for Mdns")
+
       _ ->
         Registry.dispatch(Mdns.EventManager.Registry, Mdns, fn entries ->
           for {_module, pid} <- entries, do: send(pid, message)
         end)
     end
+
     {:reply, message, state}
   end
 end
