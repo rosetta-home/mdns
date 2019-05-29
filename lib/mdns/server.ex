@@ -103,7 +103,7 @@ defmodule Mdns.Server do
     Enum.flat_map(record.qdlist, fn %DNS.Query{} = q ->
       Enum.reduce(state.services, [], fn service, answers ->
         cond do
-          service.domain == to_string(q.domain) ->
+          service.type == :a || service.domain == to_string(q.domain) ->
             data =
               case service.data do
                 :ip ->
