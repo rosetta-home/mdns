@@ -125,7 +125,7 @@ defmodule Mdns.Client do
     %Device{device | :domain => to_string(record.domain)}
   end
 
-  def handle_device({:dns_rr, _d, :txt, _id, _, _, data, _, _, _}, device) do
+  def handle_device(%DNS.Resource{:type => :txt, data: data}, device) do
     %Device{
       device
       | :payload =>
