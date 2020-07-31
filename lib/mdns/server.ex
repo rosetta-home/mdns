@@ -1,6 +1,7 @@
 defmodule Mdns.Server do
   use GenServer
   require Logger
+  alias Mdns.Utilities.Network
 
   @mdns_group {224, 0, 0, 251}
   @port Application.get_env(:mdns, :port, 5353)
@@ -63,7 +64,7 @@ defmodule Mdns.Server do
       multicast_loop: true,
       multicast_ttl: 255,
       reuseaddr: true
-    ]
+    ] ++ Network.reuse_port()
 
     {:ok, udp} = :gen_udp.open(@port, udp_options)
     {:reply, :ok, %State{state | udp: udp}}
@@ -99,7 +100,6 @@ defmodule Mdns.Server do
   end
 
   def handle_query(_ip, record, state) do
-    # Logger.debug("mDNS got query: #{inspect record}")
     Enum.flat_map(record.qdlist, fn %DNS.Query{} = q ->
       Enum.reduce(state.services, [], fn service, answers ->
         cond do

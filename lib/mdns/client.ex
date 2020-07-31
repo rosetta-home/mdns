@@ -1,6 +1,7 @@
 defmodule Mdns.Client do
   use GenServer
   require Logger
+  alias Mdns.Utilities.Network
 
   @mdns_group {224, 0, 0, 251}
   @port Application.get_env(:mdns, :port, 5353)
@@ -56,7 +57,7 @@ defmodule Mdns.Client do
       multicast_loop: true,
       multicast_ttl: 32,
       reuseaddr: true
-    ]
+    ] ++ Network.reuse_port()
 
     {:ok, udp} = :gen_udp.open(@port, udp_options)
     {:reply, :ok, %State{state | udp: udp}}
