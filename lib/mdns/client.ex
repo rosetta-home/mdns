@@ -3,9 +3,6 @@ defmodule Mdns.Client do
   require Logger
   alias Mdns.Utilities.Network
 
-  @mdns_group {224, 0, 0, 251}
-  @port Application.get_env(:mdns, :port, 5353)
-
   @query_packet %DNS.Record{
     header: %DNS.Header{},
     qdlist: []
@@ -52,14 +49,14 @@ defmodule Mdns.Client do
       active: true,
       ip: {0, 0, 0, 0},
       ifaddr: {0, 0, 0, 0},
-      add_membership: {@mdns_group, {0, 0, 0, 0}},
+      add_membership: {Network.mdns_group, {0, 0, 0, 0}},
       multicast_if: {0, 0, 0, 0},
       multicast_loop: true,
       multicast_ttl: 32,
       reuseaddr: true
     ] ++ Network.reuse_port()
 
-    {:ok, udp} = :gen_udp.open(@port, udp_options)
+    {:ok, udp} = :gen_udp.open(Network.mdns_port, udp_options)
     {:reply, :ok, %State{state | udp: udp}}
   end
 
@@ -76,7 +73,7 @@ defmodule Mdns.Client do
     }
 
     p = DNS.Record.encode(packet)
-    :gen_udp.send(state.udp, @mdns_group, @port, p)
+    :gen_udp.send(state.udp, Network.mdns_group, Network.mdns_port, p)
     {:noreply, %State{state | :queries => Enum.uniq([namespace | state.queries])}}
   end
 
