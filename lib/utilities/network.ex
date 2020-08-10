@@ -14,13 +14,9 @@ defmodule Mdns.Utilities.Network do
     end
   end
 
-  def mdns_port do
-    Application.get_env(:mdns, :port, 5353)
-  end
+  def mdns_port, do: Application.get_env(:mdns, :port, 5353)
 
-  def mdns_group do
-    {224, 0, 0, 251}
-  end
+  def mdns_group, do: {224, 0, 0, 251}
 
   defp unix_reuse_port(os_name) when os_name in [:darwin, :freebsd, :openbsd, :netbsd],
     do: [{:raw, @sol_socket, @so_reuseport, <<1::native-32>>}]

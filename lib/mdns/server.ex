@@ -83,20 +83,20 @@ defmodule Mdns.Server do
     {:reply, :ok, %State{state | :services => Enum.uniq([service | state.services])}}
   end
 
-  def handle_info({:udp, _socket, ip, _port, packet}, state) do
-    {:noreply, handle_packet(ip, packet, state)}
+  def handle_info({:udp, _socket, src_ip, src_port, packet}, state) do
+    {:noreply, handle_packet(src_ip, src_port, packet, state)}
   end
 
-  def handle_packet(ip, packet, state) do
+  def handle_packet(src_ip, src_port, packet, state) do
     record = DNS.Record.decode(packet)
 
     case record.header.qr do
-      false -> handle_query(ip, record, state)
+      false -> handle_query(src_ip, src_port, record, state)
       _ -> state
     end
   end
 
-  def handle_query(_ip, record, state) do
+  def handle_query(src_ip, src_port, record, state) do
     Enum.flat_map(record.qdlist, fn %DNS.Query{} = q ->
       Enum.reduce(state.services, [], fn service, answers ->
         cond do
@@ -129,19 +129,31 @@ defmodule Mdns.Server do
         end
       end)
     end)
-    |> send_service_response(record, state)
+    |> send_service_response(mdns_destination(src_ip, src_port), record, state)
 
     state
   end
 
-  def send_service_response(services, _record, state) do
+  def send_service_response(services, {src_ip, src_port}, record, state) do
     cond do
       length(services) > 0 ->
-        packet = %DNS.Record{@response_packet | :anlist => services}
-        :gen_udp.send(state.udp, Network.mdns_group, Network.mdns_port, DNS.Record.encode(packet))
+        header = %DNS.Header{@response_packet.header | :id => record.header.id }
+        packet = %DNS.Record{@response_packet | :anlist => services, :header => header}
+
+        :gen_udp.send(state.udp, src_ip, src_port, DNS.Record.encode(packet))
 
       true ->
         nil
     end
   end
+
+  # See RFC 6762 6.7 "Legacy Unicast Responses"
+  # If the source UDP port in a received Multicast DNS query is not port
+  # 5353, this indicates that the querier originating the query is a
+  # simple resolver (...). In this case, the Multicast DNS responder MUST
+  # send a UDP response directly back to the querier, via unicast, to the
+  # query packet's source IP address and port.
+  defp mdns_destination(_src_ip, 5353), do: {Network.mdns_group, Network.mdns_port}
+  defp mdns_destination(src_ip, src_port), do: {src_ip, src_port}
+
 end
