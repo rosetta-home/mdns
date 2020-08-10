@@ -53,17 +53,18 @@ defmodule Mdns.Server do
   def handle_call({:start, opts}, _from, state) do
     interface = opts[:interface] || {0, 0, 0, 0}
 
-    udp_options = [
-      :binary,
-      active: true,
-      add_membership: {Network.mdns_group, interface},
-      multicast_if: interface,
-      multicast_loop: true,
-      multicast_ttl: 255,
-      reuseaddr: true
-    ] ++ Network.reuse_port()
+    udp_options =
+      [
+        :binary,
+        active: true,
+        add_membership: {Network.mdns_group(), interface},
+        multicast_if: interface,
+        multicast_loop: true,
+        multicast_ttl: 255,
+        reuseaddr: true
+      ] ++ Network.reuse_port()
 
-    {:ok, udp} = :gen_udp.open(Network.mdns_port, udp_options)
+    {:ok, udp} = :gen_udp.open(Network.mdns_port(), udp_options)
     {:reply, :ok, %State{state | udp: udp}}
   end
 
@@ -129,18 +130,18 @@ defmodule Mdns.Server do
         end
       end)
     end)
-    |> send_service_response(src_ip, src_port, record, state)
+    |> send_service_response(mdns_destination(src_ip, src_port), record, state)
 
     state
   end
 
-  def send_service_response(services, src_ip, src_port, record, state) do
+  def send_service_response(services, {src_ip, src_port}, record, state) do
     cond do
       length(services) > 0 ->
-        header = %DNS.Header{@response_packet.header | :id => record.header.id }
+        header = %DNS.Header{@response_packet.header | :id => record.header.id}
         packet = %DNS.Record{@response_packet | :anlist => services, :header => header}
 
-        :gen_udp.send(state.udp, mdns_destination(src_ip, src_port), DNS.Record.encode(packet))
+        :gen_udp.send(state.udp, src_ip, src_port, DNS.Record.encode(packet))
 
       true ->
         nil
@@ -153,7 +154,6 @@ defmodule Mdns.Server do
   # simple resolver (...). In this case, the Multicast DNS responder MUST
   # send a UDP response directly back to the querier, via unicast, to the
   # query packet's source IP address and port.
-  defp mdns_destination(_src_ip, 5353), do: {Network.mdns_group, Network.mdns_port}
+  defp mdns_destination(_src_ip, 5353), do: {Network.mdns_group(), Network.mdns_port()}
   defp mdns_destination(src_ip, src_port), do: {src_ip, src_port}
-
 end
