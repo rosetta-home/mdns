@@ -34,29 +34,35 @@ defmodule Mdns.Client do
     GenServer.call(__MODULE__, :devices)
   end
 
-  def start do
-    GenServer.call(__MODULE__, :start)
+  def start(udp_opts \\ []) do
+    GenServer.call(__MODULE__, {:start, udp_opts})
   end
 
   def init(:ok) do
     {:ok, %State{}}
   end
 
-  def handle_call(:start, _from, state) do
-    udp_options = [
+  def handle_call({:start, udp_opts}, _from, state) do
+    base_udp_opts = [
       :binary,
       broadcast: true,
       active: true,
-      ip: {0, 0, 0, 0},
-      ifaddr: {0, 0, 0, 0},
-      add_membership: {Network.mdns_group, {0, 0, 0, 0}},
-      multicast_if: {0, 0, 0, 0},
-      multicast_loop: true,
-      multicast_ttl: 32,
       reuseaddr: true
     ] ++ Network.reuse_port()
 
-    {:ok, udp} = :gen_udp.open(Network.mdns_port, udp_options)
+    overridable_udp_opts =
+      [
+        ip: {0, 0, 0, 0},
+        ifaddr: {0, 0, 0, 0},
+        add_membership: {Network.mdns_group(), {0, 0, 0, 0}},
+        multicast_if: {0, 0, 0, 0},
+        multicast_loop: true,
+        multicast_ttl: 32
+      ]
+
+    udp_opts = Keyword.merge(overridable_udp_opts, udp_opts)
+
+    {:ok, udp} = :gen_udp.open(Network.mdns_port(), base_udp_opts ++ udp_opts)
     {:reply, :ok, %State{state | udp: udp}}
   end
 
@@ -73,7 +79,7 @@ defmodule Mdns.Client do
     }
 
     p = DNS.Record.encode(packet)
-    :gen_udp.send(state.udp, Network.mdns_group, Network.mdns_port, p)
+    :gen_udp.send(state.udp, Network.mdns_group(), Network.mdns_port(), p)
     {:noreply, %State{state | :queries => Enum.uniq([namespace | state.queries])}}
   end
 

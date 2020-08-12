@@ -53,7 +53,9 @@ defmodule MdnsTest do
     assert {:ok, {:hostent, char_host , [], :inet, 4, [address]}} = lookup
 
     Logger.debug "Testing Client"
-    Mdns.Client.start
+    Mdns.Client.start(buffer: 12345)
+    udp_socket = :sys.get_state(Mdns.Client).udp
+    assert {:ok, buffer: 12345} = :inet.getopts(udp_socket, [:buffer])
     Mdns.EventManager.register()
     Mdns.Server.add_service(%Mdns.Server.Service{
       domain: "_nerves._tcp.local",
