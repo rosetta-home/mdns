@@ -67,11 +67,10 @@ defmodule Mdns.Server do
     {:reply, :ok, %State{state | udp: udp}}
   end
 
-  def handle_call(:stop, _from, state) do
-    if state.udp do
-      :gen_udp.close(state.udp)
-    end
+  def handle_call(:stop, _from, %State{udp: nil} = state), do: {:reply, :ok, state}
 
+  def handle_call(:stop, _from, %State{udp: udp} = state) do
+    :gen_udp.close(udp)
     {:reply, :ok, %State{state | udp: nil}}
   end
 

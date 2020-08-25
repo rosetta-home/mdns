@@ -38,6 +38,10 @@ defmodule Mdns.Client do
     GenServer.call(__MODULE__, {:start, udp_opts})
   end
 
+  def stop() do
+    GenServer.call(__MODULE__, :stop)
+  end
+
   def init(:ok) do
     {:ok, %State{}}
   end
@@ -68,6 +72,13 @@ defmodule Mdns.Client do
 
   def handle_call(:devices, _from, state) do
     {:reply, state.devices, state}
+  end
+
+  def handle_call(:stop, _from, %State{udp: nil} = state), do: {:reply, :ok, state}
+
+  def handle_call(:stop, _from, %State{udp: udp} = state) do
+    :gen_udp.close(udp)
+    {:reply, :ok, %State{state | udp: nil}}
   end
 
   def handle_cast({:query, namespace}, state) do
