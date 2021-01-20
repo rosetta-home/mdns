@@ -157,6 +157,10 @@ defmodule Mdns.Client do
     device
   end
 
+  def handle_device(%DNS.ResourceOpt{}, device) do
+    device
+  end
+
   def handle_device({:dns_rr, _, _, _, _, _, _, _, _, _}, device) do
     device
   end
