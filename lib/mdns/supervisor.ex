@@ -7,12 +7,12 @@ defmodule Mdns.Supervisor do
 
   def init(:ok) do
     children = [
-      supervisor(Registry, [:duplicate, Mdns.EventManager.Registry, []]),
-      worker(Mdns.EventManager, []),
-      worker(Mdns.Client, []),
-      worker(Mdns.Server, [])
+      {Registry, keys: :duplicate, name: Mdns.EventManager.Registry},
+      Mdns.EventManager,
+      Mdns.Client,
+      Mdns.Server
     ]
 
-    supervise(children, strategy: :one_for_one)
+    Supervisor.init(children, strategy: :one_for_one)
   end
 end

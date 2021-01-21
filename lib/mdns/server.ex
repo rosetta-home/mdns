@@ -26,7 +26,7 @@ defmodule Mdns.Server do
               type: :ptr
   end
 
-  def start_link do
+  def start_link(_) do
     GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
   end
 

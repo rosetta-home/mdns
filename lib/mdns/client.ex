@@ -22,7 +22,7 @@ defmodule Mdns.Client do
               payload: %{}
   end
 
-  def start_link do
+  def start_link(_) do
     GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
   end
 
@@ -154,6 +154,10 @@ defmodule Mdns.Client do
   end
 
   def handle_device(%DNS.Resource{}, device) do
+    device
+  end
+
+  def handle_device(%DNS.ResourceOpt{}, device) do
     device
   end
 
