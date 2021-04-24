@@ -17,6 +17,7 @@ defmodule Mdns.Client do
 
   defmodule Device do
     defstruct ip: nil,
+              port: nil,
               services: [],
               domain: nil,
               payload: %{}
@@ -150,6 +151,13 @@ defmodule Mdns.Client do
               _ -> nil
             end
           end)
+    }
+  end
+
+  def handle_device(%DNS.Resource{:type => :srv, data: {_priority, _weight, port, _target}}, device) do
+    %Device{
+      device
+      | :port => port
     }
   end
 
