@@ -69,7 +69,18 @@ defmodule MdnsTest do
       ttl: 10,
       type: :txt
     })
+    Mdns.Server.add_service(%Mdns.Server.Service{
+      domain: host_name,
+      data: host_name,
+      ttl: 10,
+      type: 47
+    })
+
     Mdns.Client.query("_nerves._tcp.local")
     assert_receive {:"_nerves._tcp.local", %Mdns.Client.Device{ip: address, payload: %{"key" => "value"}}}, 10_000
+
+    Mdns.Client.query(host_name)
+    namespace = :"#{host_name}"
+    assert_receive {^namespace, %Mdns.Client.Device{ip: address}}, 10_000
   end
 end

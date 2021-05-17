@@ -161,6 +161,14 @@ defmodule Mdns.Client do
     }
   end
 
+  def handle_device(%DNS.Resource{:type => 47} = record, device) do
+    %Device{
+      device
+      | :services =>
+          Enum.uniq([to_string(record.data), to_string(record.domain)] ++ device.services)
+    }
+  end
+
   def handle_device(%DNS.Resource{}, device) do
     device
   end
