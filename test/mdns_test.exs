@@ -50,7 +50,7 @@ defmodule MdnsTest do
     char_host =  host_name |> String.to_charlist()
     lookup = :inet.gethostbyname(char_host, :inet)
     Logger.debug("#{inspect lookup}")
-    assert {:ok, {:hostent, char_host , [], :inet, 4, [address]}} = lookup
+    assert {:ok, {:hostent, _char_host , [], :inet, 4, [_address]}} = lookup
 
     Logger.debug "Testing Client"
     Mdns.Client.start(buffer: 12345)
@@ -77,10 +77,10 @@ defmodule MdnsTest do
     })
 
     Mdns.Client.query("_nerves._tcp.local")
-    assert_receive {:"_nerves._tcp.local", %Mdns.Client.Device{ip: address, payload: %{"key" => "value"}}}, 10_000
+    assert_receive {:"_nerves._tcp.local", %Mdns.Client.Device{ip: _address, payload: %{"key" => "value"}}}, 10_000
 
     Mdns.Client.query(host_name)
     namespace = :"#{host_name}"
-    assert_receive {^namespace, %Mdns.Client.Device{ip: address}}, 10_000
+    assert_receive {^namespace, %Mdns.Client.Device{ip: _address}}, 10_000
   end
 end
